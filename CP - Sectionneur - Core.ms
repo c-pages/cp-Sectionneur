@@ -31,7 +31,10 @@ if Sectionneur != undefined do Sectionneur.fermer ()
 
 
 ----- le  plugin material  ---------------------------
-(	include	 "$userScripts\\cp-Sectionneur\\cp - Sectionneur - Material Plugin.ms" 	)
+-- (	
+	filein	 "$userScripts\\cp-Sectionneur\\cp - Sectionneur - Material Plugin.ms" 
+	filein	 "$userScripts\\cp-Sectionneur\\cp - Sectionneur - Modifier Plugin.ms" 
+-- 	)
 
 
 
@@ -65,17 +68,29 @@ rollout roll_sectionneur "sectionneur" width:522 height:232
 	
 	
 	------------  Fonctions	----------------------------------------------------------------------------------	
-	
+	fn redimensionner		=(
+		if rdo_applyTo.state  == 1 then
+			roll_sectionneur.width = 175
+		else 
+			roll_sectionneur.width = 522
+	)
 	fn actualiser = (
+		
 		lbx_sections.items		= for section in m_prt.sections collect section.name
 		chk_ombres.checked 	= m_prt.ombres_use
+		rdo_applyTo.state 		=	m_prt.appliquerA
+		btn_appliquer.checked 	= m_prt.actif
+		
 	)
+	
 	
 	---- Initialisation de la fenetre  -----
 	fn initialiser = (
 		
-		actualiser()
-
+		redimensionner ()
+		
+		actualiser ()
+		
 	)
 	
 	
@@ -86,7 +101,7 @@ rollout roll_sectionneur "sectionneur" width:522 height:232
 	on btn_section_nvNode picked obj do
 	(
 		m_prt.ajouter_section	obj
-		actualiser ()
+		actualiser ()	
 	)
 	on btn_section_nvlleBox pressed do
 		(
@@ -103,6 +118,7 @@ rollout roll_sectionneur "sectionneur" width:522 height:232
 	on rdo_applyTo changed stat do
 	(
 		m_prt.appliquerA	= stat
+		redimensionner ()
 		)
 	on btn_appliquer changed state do
 	(
@@ -131,16 +147,10 @@ struct str_sectionneur (
 		
 		
 		------------  Membres	----------------------------------------------------------------------------------
-	private
-		
+	public
+		--- si la coupe est active ----------------
 		actif 		= false,
 		
-		---- Fenetre ----
-		dialog			= roll_sectionneur ,		---- le rollout ----
-		dialog_pos 		= [100,100],
-		dialog_taille 	= [roll_sectionneur.width, roll_sectionneur.height ],
-		
-	public
 		---- Materiau / map pour la découpe --------------
 		distMap 			= CoronaDistance (),
 		invisMat 		= CoronaMtl (),
@@ -152,6 +162,17 @@ struct str_sectionneur (
 		--- Ombre---------
 		ombres_use		=	true,
 		ombres_nodes		=	#(),
+		
+	private
+		
+		---- Fenetre ----
+		dialog			= roll_sectionneur ,		---- le rollout ----
+		dialog_pos 		= [100,100],
+		dialog_taille 	= [roll_sectionneur.width, roll_sectionneur.height ],
+		
+		---- claque temporarire pour les objets des ombres --------------
+		calque_temp,
+		calque_temp_nom	=	"000 - Section - Ombres -TEMP",
 		
 		------------  Fonctions	----------------------------------------------------------------------------------
 	private
@@ -235,8 +256,10 @@ struct str_sectionneur (
 							_node.material.materialList[i]		= _node.material.materialList[i].'Base material'
 				)
 				Blend:	(
-					_node.material.map1					= 	_node.material.map1.'Base material'
-					_node.material.map2					= 	_node.material.map2.'Base material'
+					if classof _node.material.map1 == sectionneur_material do
+						_node.material.map1					= 	_node.material.map1.'Base material'
+					if classof _node.material.map2 == sectionneur_material do
+						_node.material.map2					= 	_node.material.map2.'Base material'
 				)
 				DoubleSided:	(
 					if classof _node.material.material1 == sectionneur_material do
@@ -250,6 +273,7 @@ struct str_sectionneur (
 		),
 		fn retirer_tout =(
 			
+			debug "retirer_tout" 
 			actif = false
 			
 			for nd in geometry do 
@@ -340,24 +364,48 @@ struct str_sectionneur (
 		
 		
 		fn creer_ombres_objets = 	if actif and ombres_use do (
+			---- Pour l'instant, pas d'omre avec le multiscatter -------
+			
 			
 			debug "creer_ombres_objets" var:actif
 			
+			---------	creation du calque temporaire ----------
+			calque_temp 			= LayerManager.getLayerFromName  calque_temp_nom 
+			if calque_temp == undefined do 
+				calque_temp 			= LayerManager.newLayerFromName calque_temp_nom
+			
+			debug "calque_temp" var:calque_temp
+			
 			ombres_nodes= #()
+			
 			local nodes_aDupliquer = for obj in geometry where not est_section obj	collect  obj
-			for obj in nodes_aDupliquer where obj.renderByLayer	and obj.layer.renderable or obj.renderable	do (
+			
+			for obj in nodes_aDupliquer where obj.renderByLayer	and obj.layer.renderable or obj.renderable	do 
+				if classof  obj != MultiScatter do (
 				
-				local node_dupl =  instance  obj 
-				retirer_matSection   node_dupl
-				append ombres_nodes  node_dupl
-				node_dupl.renderByLayer		=	false
-				node_dupl.primaryVisibility 	= false
-				
-			)
+					local node_dupl =  instance  obj 
+					retirer_matSection  		node_dupl
+					append ombres_nodes 	node_dupl
+					
+					node_dupl.renderByLayer		=	false
+					node_dupl.primaryVisibility 	= 	false
+					node_dupl.displayByLayer  	= false
+					node_dupl.boxMode 				= true
+					
+					node_dupl.parent 				= 	obj
+					
+					freeze node_dupl
+					
+					calque_temp.addnode node_dupl
+					
+				)
 			
 		),
 		fn supprimer_ombres_objets =  if actif and ombres_use  do (
 			debug "supprimer_ombres_objets"
+			
+			LayerManager.deleteLayerByName 	calque_temp_nom
+			
 			delete ombres_nodes 
 			ombres_nodes= #()
 		),
@@ -385,12 +433,12 @@ struct str_sectionneur (
 
 
 global Sectionneur		=	str_sectionneur ()
--- clearlistener ()
+clearlistener ()
 Sectionneur.ouvrir ()
 
-Sectionneur.creer_ombres_objets ()
-Sectionneur.supprimer_ombres_objets ()
-
+-- Sectionneur.retirer_tout ()
+-- Sectionneur.creer_ombres_objets ()
+-- Sectionneur.supprimer_ombres_objets ()
 
 
 
