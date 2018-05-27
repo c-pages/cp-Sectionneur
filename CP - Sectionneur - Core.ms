@@ -281,7 +281,7 @@ struct str_sectionneur (
 		),
 		
 		
-		fn appliquer 	=(
+		fn appliquer 	=  if sections.count > 0 do (
 			debug "appliquer"
 			actif = true
 			
@@ -436,7 +436,7 @@ global Sectionneur		=	str_sectionneur ()
 clearlistener ()
 Sectionneur.ouvrir ()
 
--- Sectionneur.retirer_tout ()
+Sectionneur.retirer_tout ()
 -- Sectionneur.creer_ombres_objets ()
 -- Sectionneur.supprimer_ombres_objets ()
 

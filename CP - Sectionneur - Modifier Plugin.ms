@@ -1,4 +1,4 @@
-plugin modifier Sectionneur_modifier
+plugin modifier sectionneur_modifier
 name:"Sectionneur"
 classID:#(685325,452281)
 extends:edit_poly 
