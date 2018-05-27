@@ -3,6 +3,7 @@ name:"Sectionneur"
 classID:#(685325,452281)
 extends:edit_poly 
 replaceUI:true 
+invisible:true
 version:1
 (
 	parameters main rollout:params

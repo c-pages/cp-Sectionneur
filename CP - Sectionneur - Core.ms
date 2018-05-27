@@ -23,6 +23,14 @@ if Sectionneur != undefined do Sectionneur.fermer ()
 
 
 
+global Sectionneur	
+
+
+filein	 "$userScripts\\cp-Sectionneur\\cp - Sectionneur - Material Plugin.ms" 
+filein	 "$userScripts\\cp-Sectionneur\\cp - Sectionneur - Modifier Plugin.ms" 
+
+
+
 ------------ DEBUG	-------------------------------------------------------------------------------------------------------------------------
 (	include	 "$userScripts\\cp-Urba\\modules\\Commun\\Urba - Debug.ms"  )
 ------------ DEBUG	-------------------------------------------------------------------------------------------------------------------------
@@ -32,8 +40,8 @@ if Sectionneur != undefined do Sectionneur.fermer ()
 
 ----- le  plugin material  ---------------------------
 -- (	
-	filein	 "$userScripts\\cp-Sectionneur\\cp - Sectionneur - Material Plugin.ms" 
-	filein	 "$userScripts\\cp-Sectionneur\\cp - Sectionneur - Modifier Plugin.ms" 
+-- 	filein	 "$userScripts\\cp-Sectionneur\\cp - Sectionneur - Material Plugin.ms" 
+-- 	filein	 "$userScripts\\cp-Sectionneur\\cp - Sectionneur - Modifier Plugin.ms" 
 -- 	)
 
 
@@ -76,10 +84,10 @@ rollout roll_sectionneur "sectionneur" width:522 height:232
 	)
 	fn actualiser = (
 		
-		lbx_sections.items		= for section in m_prt.sections collect section.name
-		chk_ombres.checked 	= m_prt.ombres_use
-		rdo_applyTo.state 		=	m_prt.appliquerA
-		btn_appliquer.checked 	= m_prt.actif
+		lbx_sections.items		= 	for section in m_prt.get_sections() collect section.name
+		chk_ombres.checked 	= 	m_prt.get_ombresUse ()
+		rdo_applyTo.state 		=	m_prt.get_mode ()
+		btn_appliquer.checked 	= 	m_prt.est_actif ()
 		
 	)
 	
@@ -98,11 +106,10 @@ rollout roll_sectionneur "sectionneur" width:522 height:232
 
 	
 	
-	on btn_section_nvNode picked obj do
-	(
-		m_prt.ajouter_section	obj
-		actualiser ()	
-	)
+	on btn_section_nvNode picked obj do	(
+				m_prt.ajouter_section	obj
+				actualiser ()	
+			)
 	on btn_section_nvlleBox pressed do
 		(
 		
@@ -112,22 +119,21 @@ rollout roll_sectionneur "sectionneur" width:522 height:232
 		
 		)
 	on chk_ombres changed state do
-	(
-		m_prt.ombres_use = state
-	)
-	on rdo_applyTo changed stat do
-	(
-		m_prt.appliquerA	= stat
-		redimensionner ()
-		)
-	on btn_appliquer changed state do
-	(
+				m_prt.set_ombresUse	 state
+	on rdo_applyTo changed state do	(
+				m_prt.set_mode	 state
+				redimensionner ()
+			)
+	on btn_appliquer changed state do	(
 			case state of (
-				true:		m_prt.appliquer 		()
-				false: 	m_prt.retirer_tout 	()
+				true:		m_prt.activer 		()
+				false: 	m_prt.desactiver 	()
 			)
 		)
-)
+) ---- fin rollout -------------
+
+
+
 
 ------------------------------------------------------------------------------
 ----------	Structure								 -------------------------
@@ -140,28 +146,28 @@ struct str_sectionneur (
 		fn debug 	_txt  var:	 param:    =	
 			try if m_debug  do ::debuger 	_txt	prefix:"Sectionneur "	  	var:var	 param:param		catch (),
 	------------ DEBUG	-------------------------------------------------------------------------------------------------------------------------
-
+		
 		
 		
 		
 		
 		
 		------------  Membres	----------------------------------------------------------------------------------
-	public
+	private
 		--- si la coupe est active ----------------
-		actif 		= false,
+		actif 				= 	false,
+		effectif			=	false,
+		
+		mode				=	1,		---- ( 1: Scene, 2: nodes, 3: layers, 4: Xrefs	)
+		ombres_use	=	true,
 		
 		---- Materiau / map pour la découpe --------------
 		distMap 			= CoronaDistance (),
 		invisMat 		= CoronaMtl (),
+-- 		blendMat 		= Blend (),
 		
 		--- sections -----
 		sections 		=	#(),
-		appliquerA		=	1,		---- ( 1: Scene, 2: nodes, 3: layers, 4: Xrefs	)
-		
-		--- Ombre---------
-		ombres_use		=	true,
-		ombres_nodes		=	#(),
 		
 	private
 		
@@ -170,45 +176,46 @@ struct str_sectionneur (
 		dialog_pos 		= [100,100],
 		dialog_taille 	= [roll_sectionneur.width, roll_sectionneur.height ],
 		
-		---- claque temporarire pour les objets des ombres --------------
+		---- calque temporarire pour les objets des ombres --------------
 		calque_temp,
 		calque_temp_nom	=	"000 - Section - Ombres -TEMP",
 		
+		
 		------------  Fonctions	----------------------------------------------------------------------------------
 	private
-	
-		----------------- Ecouteurs	----------------------
+		fn desactiver_prePost_rendu =(		
+			callbacks.removescripts 	id:	#sectionneur_preRender
+			callbacks.removescripts 	id:#sectionneur_postRender
+			gc()
+		),
 		fn activer_prePost_rendu =(
 			
-			---- PRERENDU	-----------
-			callbacks.removescripts 	id:	#sectionneur_preRender
-			callbacks.removescripts 	id:#sectionneur_postRenderProxy
-			gc()
-			
+			desactiver_prePost_rendu ()			
 			
 			global terrains_asProxy =#()
 			local		txt_pre ="with redraw off (\n"
-						txt_pre +="	format\"sectionneur_preRender : %\\n\"	Sectionneur \n"
-						txt_pre +="	Sectionneur.creer_ombres_objets ()\n	"
+			 			txt_pre +="	format \"----> callbacks 	#preRender \\n\"\n"
+						txt_pre +="	sectionneur.appliquer()\n"
 						txt_pre +=")"
 			callbacks.addscript 	#preRender 	txt_pre 		id:#sectionneur_preRender
-
-
-
+			
 			---- post rendu	-----------
 			local		txt_post ="with redraw off (\n"
-						txt_post +="	format\"sectionneur_postRenderProxy: %\\n\"	Sectionneur 	\n	"
-						txt_post +="	Sectionneur.supprimer_ombres_objets ()\n	"
+			 			txt_post +="	format \"----> callbacks 	#postRender \\n\"\n"
+						txt_post +="	sectionneur.retirer()\n"
 						txt_post +=")"
-			callbacks.addscript 	#postRender 	txt_post 		id:#sectionneur_postRenderProxy
+			callbacks.addscript 	#postRender 	txt_post 		id:#sectionneur_postRender
 
 		),
 		
 		
 		
-	
-	
-	
+		
+		fn est_section		_node =(
+			local result = false
+			if findItem sections 	_node != 0 then result = true
+			result
+		),		
 		fn preparer_materiau_section	 =(
 			
 			--- la map de distance ---------------
@@ -221,32 +228,16 @@ struct str_sectionneur (
 			distMap.distanceFar		=	0.
 			
 			--- le materiau invisible -------
-			invisMat 						=	CoronaMtl	name:"Section - Invisible"
-			invisMat.levelOpacity		=	0
+			invisMat 					=	CoronaMtl	name:"Section - Invisible"
+			invisMat.levelOpacity	=	0
+			
 			
 		),
 		
-		fn est_section		_node =(
-			local result = false
-			if findItem sections 	_node != 0 then result = true
-			result
-		),
 		
-		fn est_ombre		_node =(
-			local result = false
-			if findItem ombres_nodes 	_node != 0 then result = true
-			result
-		),
 		
--- 	public		
 		
-		------------  Interface	----------------------------------------------------------------------------------
-	public
-		fn ajouter_section	_node =(
-			appendIfUnique  sections		_node
-			distMap.nodes = sections
-		),
-		fn retirer_matSection		_node	=(
+		fn retirer_section_material		_node	=(
 			
 			
 			case classOf _node.material of (
@@ -267,29 +258,137 @@ struct str_sectionneur (
 					if classof nd.material.material2 == sectionneur_material do
 						_node.material.material2					= 	_node.material.material2.'Base material'
 				)
-				sectionneur_material:	_node.material	=	 _node.material.'Base material'
+				sectionneur_material:			_node.material	=	 _node.material.'Base material'
+				Sectionneur_undefined_mat:	_node.material	=	 undefined
 			) -- fin case -----
 			
-		),
-		fn retirer_tout =(
+		),		
+		fn get_section_material		_mat	=(
 			
-			debug "retirer_tout" 
-			actif = false
+			local result
 			
-			for nd in geometry do 
-				retirer_matSection 	nd
+			case classOf _mat of (
+				Multimaterial:	(
+					local multiMat	=	copy _mat
+					
+					for i = 1 to _mat.materialList.count	 do (
+						--- on applique le materiau Section -------------
+						local mat_section 				= 	sectionneur_material ()				
+						mat_section.'Base material' 	=	_mat.materialList[i]
+						multiMat.materialList[i]			= 	mat_section
+					)
+					result = multiMat
+				)
+				Blend:			(
+					local blendMat	=	Blend ()
+					
+					--- on applique le materiau Section -------------
+					local mat_section 				= 	sectionneur_material ()				
+					mat_section.'Base material' 	=	_mat.map1
+					blendMat.map1					= 	mat_section
+				
+					--- on applique le materiau Section -------------
+					local mat_section 				= 	sectionneur_material ()				
+					mat_section.'Base material' 	=	_mat.map2
+					blendMat.map2					= 	mat_section
+					
+					result = blendMat
+				)
+				DoubleSided:	(
+					local dbleSideMat	=	DoubleSided ()
+					
+					--- on applique le materiau Section -------------
+					local mat_section 				= 	sectionneur_material ()				
+					mat_section.'Base material' 	=	_mat.material1
+					dbleSideMat.material1			= 	mat_section
+				
+					--- on applique le materiau Section -------------
+					local mat_section 				= 	sectionneur_material ()				
+					mat_section.'Base material' 	=	_mat.material2
+					dbleSideMat.material2			= 	mat_section
+					
+					result 								= dbleSideMat
+					
+				)
+				default:			(
+					--- on applique le materiau Section -------------
+					local mat_section 				= sectionneur_material ()				
+					mat_section.'Base material' 	=	_mat
+					result 								= mat_section
+				)
+			)
+			result
 		),
 		
 		
-		fn appliquer 	=  if sections.count > 0 do (
+		
+		
+		------------  Interface	----------------------------------------------------------------------------------
+	public		
+		fn est_actif					=	actif,
+		fn get_sections				=	for sect in sections collect sect,
+		fn set_mode	_mode		= 	mode = _mode,
+		fn get_mode					= 	mode,
+		fn get_ombresUse			=	ombres_use,
+		fn set_ombresUse	_val	=	ombres_use = _val,
+		fn get_blendMat 				=  (
+			--- le blend --------------------------
+			local blendMat 			= Blend ()			
+			blendMat.map2			=	invisMat
+			blendMat.mask			=	distMap
+			
+			blendMat
+		),
+		
+		
+		fn estValide_prMatSection		_nd =(
+			result = true
+			
+			if not _nd.renderByLayer	and not _nd.renderable 			then	result = false
+			else if _nd.renderByLayer	and not _nd.layer.renderable 	then	result = false			
+			else if est_section obj 													do	result = false
+			
+			result
+		),
+		
+		fn ajouter_section			_node 	=(
+			appendIfUnique  sections		_node
+			distMap.nodes = sections
+		),
+		
+		
+		fn get_objects_byMat 	_mat =(
+			for obj in geometry where obj.material == _mat	collect obj
+		),
+		
+		----------------------------------------------------------------------------
+		fn desactiver =(
+			actif = false			
+			desactiver_prePost_rendu()		
+		),
+		fn activer 	=(
+			actif = true			
+			activer_prePost_rendu()
+		),
+		
+		
+		
+		fn appliquer = if not effectif do (
+			
 			debug "appliquer"
-			actif = true
+			effectif = true
 			
-			---- on regarde quelles nodes ca concerne ------------------
+			--- Progress bar ---------------------------
+			local compteur = 0
+			progressStart ( "Creation des texture" )
+			
+			local tmp1 = timeStamp ()
+			
+			---- on regarde quelles nodes ca concerne pour determiner à quel nodes on applique ------------------
 			local nodes_aCouper =#()
-			case appliquerA of(
+			case mode of(
 				1: ( --- Scene ---
-					nodes_aCouper = for obj in geometry where  not est_section obj	and not est_ombre obj collect obj	
+					nodes_aCouper = for obj in geometry	  where 	estValide_prMatSection		obj	 	collect obj	
 				)
 				2:	( --- nodes ---
 				
@@ -303,112 +402,75 @@ struct str_sectionneur (
 			)
 			
 			
-			progressStart ( "Creation des texture" )
+			debug "----->nodes_aCouper" 	var:nodes_aCouper 	param:#name
 			
-			local compteur = 0
-			---- on applique le mat de decoupe ------------------
-			for nd in nodes_aCouper 	do (
+			local tmp2 = timeStamp ()
+			
+			---- on fait  des listes  d'objets regroupés par materiaux ----------------
+			local ids_obj_aTraiter = #{1..nodes_aCouper.count}
+			while ( ids_obj_aTraiter as array ).count>0	/* and compteur < 50  */do (
+					
 				
+				--- Progress bar ---------------------------
 				compteur += 1
-				local pourCent = (compteur as float) / nodes_aCouper.count * 100
-				progressUpdate pourCent
+				progressUpdate 	(  (nodes_aCouper.count - ( ids_obj_aTraiter as array ).count)  / nodes_aCouper.count * 100 )
 				
-				--- si le node n'a pas de mat on lui en applique un -------------
-				if nd.material == undefined do
-					nd.material = CoronaMtl	 colorDiffuse:nd.wirecolor
+				debug "ids_obj_aTraiter" var:ids_obj_aTraiter
 				
-				case classOf nd.material of (
-					Multimaterial:	(
-						for i = 1 to nd.material.materialList.count	 do (
-							--- on applique le materiau Section -------------
-							local mat_section 				= 	sectionneur_material ()				
-							mat_section.'Base material' 	=	nd.material.materialList[i]
-							nd.material.materialList[i]		= 	mat_section
-						)
-					)
-					Blend:			(
-						--- on applique le materiau Section -------------
-						local mat_section 				= 	sectionneur_material ()				
-						mat_section.'Base material' 	=	nd.material.map1
-						nd.material.map1					= 	mat_section
+				
+				
+				
+				local id_obj_aTraiter 					=	( ids_obj_aTraiter as array)[1]
+				ids_obj_aTraiter[id_obj_aTraiter]		= false
+				local nd 									= nodes_aCouper[	id_obj_aTraiter	]
+
+					debug "----->nd" var:nd param:#name	
+					debug "----->nd.material" var:nd.material param:#name			
+
+				
+				if nd.material  != undefined then (
 					
-						--- on applique le materiau Section -------------
-						local mat_section 				= 	sectionneur_material ()				
-						mat_section.'Base material' 	=	nd.material.map2
-						nd.material.map2					= 	mat_section
-					)
-					DoubleSided:	(
-						--- on applique le materiau Section -------------
-						local mat_section 				= 	sectionneur_material ()				
-						mat_section.'Base material' 	=	nd.material.material1
-						nd.material.material1			= 	mat_section
+					local objs_memeMat 	= for i = 1 to nodes_aCouper.count where ids_obj_aTraiter[i] 	and 		nodes_aCouper[i].material == nd.material 	collect ( ids_obj_aTraiter[i] = false ; nodes_aCouper[i] )
 					
-						--- on applique le materiau Section -------------
-						local mat_section 				= 	sectionneur_material ()				
-						mat_section.'Base material' 	=	nd.material.material2
-						nd.material.material2			= 	mat_section
-					)
-					default:			(
-						--- on applique le materiau Section -------------
-						local mat_section 				= sectionneur_material ()				
-						mat_section.'Base material' 	=	nd.material
-						nd.material 						= mat_section
-					)
+					
+					
+					local mat_section 		= get_section_material 	nd.material
+					append objs_memeMat 	nd
+					debug "----->objs_memeMat" var:objs_memeMat param:#name
+					
+					objs_memeMat.material = mat_section
+					
+				) else (	
+					
+					local mat_section 	= get_section_material 	( Sectionneur_undefined_mat 	name:"Sectionneur_undefined_mat"		color:nd.wirecolor )
+					nd.material 			= mat_section
+					
 				)
-				
 				
 			)
+			
+			local tmp3 = timeStamp ()
+			
 			progressEnd() 
+			
 			debug "fin appliquer"
+			
+			debug ("---	part 1  	" +  (  ((timeStamp ()) - tmp1 ) / 1000.0)	as string  )
+			debug ("---	part 2  	" +  (  ( tmp3 - tmp2 ) / 1000.0)	as string  )
+			debug ("---	total  	" +  (  ((timeStamp ()) - tmp1 ) / 1000.0)	as string  )
+			
+			
+		),		
+		fn retirer =(
+			
+			debug "retirer"
+			effectif = false
+			
+			for nd in geometry do 
+				retirer_section_material 	nd
 		),
 		
 		
-		fn creer_ombres_objets = 	if actif and ombres_use do (
-			---- Pour l'instant, pas d'omre avec le multiscatter -------
-			
-			
-			debug "creer_ombres_objets" var:actif
-			
-			---------	creation du calque temporaire ----------
-			calque_temp 			= LayerManager.getLayerFromName  calque_temp_nom 
-			if calque_temp == undefined do 
-				calque_temp 			= LayerManager.newLayerFromName calque_temp_nom
-			
-			debug "calque_temp" var:calque_temp
-			
-			ombres_nodes= #()
-			
-			local nodes_aDupliquer = for obj in geometry where not est_section obj	collect  obj
-			
-			for obj in nodes_aDupliquer where obj.renderByLayer	and obj.layer.renderable or obj.renderable	do 
-				if classof  obj != MultiScatter do (
-				
-					local node_dupl =  instance  obj 
-					retirer_matSection  		node_dupl
-					append ombres_nodes 	node_dupl
-					
-					node_dupl.renderByLayer		=	false
-					node_dupl.primaryVisibility 	= 	false
-					node_dupl.displayByLayer  	= false
-					node_dupl.boxMode 				= true
-					
-					node_dupl.parent 				= 	obj
-					
-					freeze node_dupl
-					
-					calque_temp.addnode node_dupl
-					
-				)
-			
-		),
-		fn supprimer_ombres_objets =  if actif and ombres_use  do (
-			debug "supprimer_ombres_objets"
-			
-			LayerManager.deleteLayerByName 	calque_temp_nom
-			
-			delete ombres_nodes 
-			ombres_nodes= #()
-		),
 		
 		
 		---- fenetre ------------------------------------------------------------------------------
@@ -422,21 +484,23 @@ struct str_sectionneur (
 			try destroydialog dialog catch ()
 		),
 		
-		------------  Evenements	----------------------------------------------------------------------------------
+		 ------------  Evenements	----------------------------------------------------------------------------------
 		on create do (
 			preparer_materiau_section ()
-			activer_prePost_rendu ()
 		)
 		
 ) --- fin struct ----------------------------------
 
+-- format "BAH ALORS \n"
+
+Sectionneur		=	str_sectionneur ()
 
 
-global Sectionneur		=	str_sectionneur ()
-clearlistener ()
-Sectionneur.ouvrir ()
+------ DEBUG --------------------
+Sectionneur.retirer ()
 
-Sectionneur.retirer_tout ()
+
+
 -- Sectionneur.creer_ombres_objets ()
 -- Sectionneur.supprimer_ombres_objets ()
 
@@ -914,6 +978,7 @@ distanceFar
 
 
  MAT CORONA ---
+ CoronaMtl
    .colorDiffuse : RGB color
   .colorReflect (colorReflection) : RGB color
   .colorRefract (colorRefraction) : RGB color
