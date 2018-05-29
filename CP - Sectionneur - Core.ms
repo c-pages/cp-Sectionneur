@@ -60,10 +60,10 @@ rollout roll_sectionneur "sectionneur" width:522 height:232
 	------------  UI	----------------------------------------------------------------------------------		
 	listbox 'lbx_sections' "" pos:[10,23] width:156 height:7 align:#left
 	pickbutton 'btn_section_nvNode' "Node" pos:[43,7] width:34 height:16 align:#left
-	button 'btn_section_nvlleBox' "Box" pos:[9,7] width:34 height:16 align:#left
+-- 	button 'btn_section_nvlleBox' "Box" pos:[9,7] width:34 height:16 align:#left
 	pickbutton 'btn_section_supprimer' "Suppr." pos:[131,7] width:34 height:16 align:#left
 	checkbox 'chk_ombres' "Ombres" pos:[9,121] width:117 height:15 checked:true align:#left
-	radiobuttons 'rdo_applyTo' "Apply to :" pos:[9,139] width:108 height:46 labels:#("Scene", "Nodes", "Layers", "XRef") columns:2 align:#left
+	radiobuttons 'rdo_applyTo' "Apply to :" pos:[9,139] width:108 height:46 labels:#("Scene", "Nodes", "XRef") columns:2 align:#left
 	checkbutton 'btn_appliquer' "Appliquer Sections" pos:[9,189] width:156 height:34 align:#left
 	listbox 'lbx_exclude' "" pos:[181,23] width:156 height:15 align:#left
 	listbox 'lbx_include' "" pos:[354,23] width:156 height:15 align:#left
@@ -134,7 +134,6 @@ rollout roll_sectionneur "sectionneur" width:522 height:232
 
 
 
-
 ------------------------------------------------------------------------------
 ----------	Structure								 -------------------------
 ------------------------------------------------------------------------------
@@ -169,12 +168,16 @@ struct str_sectionneur (
 		--- sections -----
 		sections 		=	#(),
 		
+		
+		materiaux_decoupe =#(),
+		
+		
 	private
 		
 		---- Fenetre ----
 		dialog			= roll_sectionneur ,		---- le rollout ----
 		dialog_pos 		= [100,100],
-		dialog_taille 	= [roll_sectionneur.width, roll_sectionneur.height ],
+		dialog_taille 	= [dialog.width, dialog.height ],
 		
 		---- calque temporarire pour les objets des ombres --------------
 		calque_temp,
@@ -183,7 +186,7 @@ struct str_sectionneur (
 		
 		------------  Fonctions	----------------------------------------------------------------------------------
 	private
-		fn desactiver_prePost_rendu =(		
+		/* fn desactiver_prePost_rendu =(		
 			callbacks.removescripts 	id:	#sectionneur_preRender
 			callbacks.removescripts 	id:#sectionneur_postRender
 			gc()
@@ -207,8 +210,7 @@ struct str_sectionneur (
 			callbacks.addscript 	#postRender 	txt_post 		id:#sectionneur_postRender
 
 		),
-		
-		
+		 */
 		
 		
 		fn est_section		_node =(
@@ -276,6 +278,7 @@ struct str_sectionneur (
 						local mat_section 				= 	sectionneur_material ()				
 						mat_section.'Base material' 	=	_mat.materialList[i]
 						multiMat.materialList[i]			= 	mat_section
+						append materiaux_decoupe 	mat_section
 					)
 					result = multiMat
 				)
@@ -286,11 +289,13 @@ struct str_sectionneur (
 					local mat_section 				= 	sectionneur_material ()				
 					mat_section.'Base material' 	=	_mat.map1
 					blendMat.map1					= 	mat_section
+						append materiaux_decoupe 	mat_section
 				
 					--- on applique le materiau Section -------------
 					local mat_section 				= 	sectionneur_material ()				
 					mat_section.'Base material' 	=	_mat.map2
 					blendMat.map2					= 	mat_section
+						append materiaux_decoupe 	mat_section
 					
 					result = blendMat
 				)
@@ -301,11 +306,13 @@ struct str_sectionneur (
 					local mat_section 				= 	sectionneur_material ()				
 					mat_section.'Base material' 	=	_mat.material1
 					dbleSideMat.material1			= 	mat_section
+						append materiaux_decoupe 	mat_section
 				
 					--- on applique le materiau Section -------------
 					local mat_section 				= 	sectionneur_material ()				
 					mat_section.'Base material' 	=	_mat.material2
 					dbleSideMat.material2			= 	mat_section
+						append materiaux_decoupe 	mat_section
 					
 					result 								= dbleSideMat
 					
@@ -315,6 +322,7 @@ struct str_sectionneur (
 					local mat_section 				= sectionneur_material ()				
 					mat_section.'Base material' 	=	_mat
 					result 								= mat_section
+						append materiaux_decoupe 	mat_section
 				)
 			)
 			result
@@ -330,7 +338,10 @@ struct str_sectionneur (
 		fn set_mode	_mode		= 	mode = _mode,
 		fn get_mode					= 	mode,
 		fn get_ombresUse			=	ombres_use,
-		fn set_ombresUse	_val	=	ombres_use = _val,
+		fn set_ombresUse	_val	= with redraw off 	(
+			ombres_use = _val
+			materiaux_decoupe.shadows = ombres_use
+		),
 		fn get_blendMat 				=  (
 			--- le blend --------------------------
 			local blendMat 			= Blend ()			
@@ -352,8 +363,28 @@ struct str_sectionneur (
 		),
 		
 		fn ajouter_section			_node 	=(
+			
+			---- on retire les node deleted -------------
+			local id_deleted =#()
+			for i = 1 to sections.count do
+				if isDeleted sections[i]  do
+					append id_deleted  i
+			for i = id_deleted.count to 1 by -1 do
+				deleteItem sections  id_deleted[i]
+			
+			
+			---- on so'ccupe de notre section ----------
+			_node.material = undefined
+			_node.displayByLayer  	= false
+			_node.renderByLayer  	= false
+			_node.boxMode 			= true
+			_node.renderable  		= false
+			
+			
+			---- on l'applique au distance map  ----------
 			appendIfUnique  sections		_node
 			distMap.nodes = sections
+			
 		),
 		
 		
@@ -362,25 +393,16 @@ struct str_sectionneur (
 		),
 		
 		----------------------------------------------------------------------------
-		fn desactiver =(
-			actif = false			
-			desactiver_prePost_rendu()		
-		),
-		fn activer 	=(
-			actif = true			
-			activer_prePost_rendu()
-		),
+	private
 		
 		
-		
-		fn appliquer = if not effectif do (
+		fn appliquer =  (
 			
 			debug "appliquer"
-			effectif = true
-			
+			materiaux_decoupe = #()
 			--- Progress bar ---------------------------
 			local compteur = 0
-			progressStart ( "Creation des texture" )
+			progressStart ( "Creation des texture de decoupe" )
 			
 			local tmp1 = timeStamp ()
 			
@@ -388,7 +410,7 @@ struct str_sectionneur (
 			local nodes_aCouper =#()
 			case mode of(
 				1: ( --- Scene ---
-					nodes_aCouper = for obj in geometry	  where 	estValide_prMatSection		obj	 	collect obj	
+					nodes_aCouper = geometry as array	--for obj in geometry	  	collect obj	
 				)
 				2:	( --- nodes ---
 				
@@ -405,45 +427,69 @@ struct str_sectionneur (
 			debug "----->nodes_aCouper" 	var:nodes_aCouper 	param:#name
 			
 			local tmp2 = timeStamp ()
+			local nodes_aTraiter = for obj in nodes_aCouper where	not est_section	obj	 collect obj
 			
 			---- on fait  des listes  d'objets regroupés par materiaux ----------------
-			local ids_obj_aTraiter = #{1..nodes_aCouper.count}
-			while ( ids_obj_aTraiter as array ).count>0	/* and compteur < 50  */do (
-					
+-- 			local ids_obj_aTraiter = #{1..nodes_aCouper.count}
+			while nodes_aTraiter.count>0	 /* and compteur < 200 */  do (
 				
+				
+			local tmpA_1 = timeStamp ()
 				--- Progress bar ---------------------------
 				compteur += 1
-				progressUpdate 	(  (nodes_aCouper.count - ( ids_obj_aTraiter as array ).count)  / nodes_aCouper.count * 100 )
-				
-				debug "ids_obj_aTraiter" var:ids_obj_aTraiter
-				
-				
+				local progress_val 	= ( ( nodes_aCouper.count as float ) - ( nodes_aTraiter.count  as float ) ) 
+				progress_val 			= progress_val  / nodes_aCouper.count * 100
+				progressUpdate 	progress_val
 				
 				
-				local id_obj_aTraiter 					=	( ids_obj_aTraiter as array)[1]
-				ids_obj_aTraiter[id_obj_aTraiter]		= false
-				local nd 									= nodes_aCouper[	id_obj_aTraiter	]
+				
+				
+				local nd 			= nodes_aTraiter[	1	]
+				
 
-					debug "----->nd" var:nd param:#name	
-					debug "----->nd.material" var:nd.material param:#name			
+					debug "\n\n----->nd" var:nd param:#name	
+					debug "----->nd.material" var:nd.material param:#name		
+-- 					debug "----->nodes_aTraiter" var:nodes_aTraiter param:#name	
+					debug "----->nodes_aTraiter COUNT" var:nodes_aTraiter.count
 
+			local tmpA_2 = timeStamp ()
+			debug ("---	A 1 : " +  (  ( tmpA_2- tmpA_1 ) / 1000.0)	as string  )
 				
 				if nd.material  != undefined then (
 					
-					local objs_memeMat 	= for i = 1 to nodes_aCouper.count where ids_obj_aTraiter[i] 	and 		nodes_aCouper[i].material == nd.material 	collect ( ids_obj_aTraiter[i] = false ; nodes_aCouper[i] )
+-- 				local objs_memeMat = #(  nd )
+					local ids_aSupprimer 	= #{}
+					local	objs_memeMat 	= for i = 1 to nodes_aTraiter.count where 	 nodes_aTraiter[i].material == nd.material  	collect  ( ids_aSupprimer[i] = true; nodes_aTraiter[i] )
 					
+			local tmpA_3 = timeStamp ()
+			debug ("---	A 2 : " +  (  ( tmpA_3- tmpA_2 ) / 1000.0)	as string  )
 					
 					
 					local mat_section 		= get_section_material 	nd.material
-					append objs_memeMat 	nd
-					debug "----->objs_memeMat" var:objs_memeMat param:#name
+					
+			local tmpA_4 = timeStamp ()
+			debug ("---	A 3 : " +  (  ( tmpA_4- tmpA_3 ) / 1000.0)	as string  )
 					
 					objs_memeMat.material = mat_section
+					
+					debug "----->objs_memeMat" var:objs_memeMat param:#name
+					
+			local tmpA_5 = timeStamp ()
+			debug ("---	A 4 : " +  (  ( tmpA_5- tmpA_4 ) / 1000.0)	as string  )
+					
+					for i = (ids_aSupprimer as array).count to 1 by -1 do 
+						deleteItem nodes_aTraiter 	( ( ids_aSupprimer) as array)[i]
+					
+					
+			local tmpA_6 = timeStamp ()
+			debug ("---	A 4 : " +  (  ( tmpA_6- tmpA_5 ) / 1000.0)	as string  )
 					
 				) else (	
 					
 					local mat_section 	= get_section_material 	( Sectionneur_undefined_mat 	name:"Sectionneur_undefined_mat"		color:nd.wirecolor )
 					nd.material 			= mat_section
+					
+					deleteItem nodes_aTraiter 1
 					
 				)
 				
@@ -455,20 +501,32 @@ struct str_sectionneur (
 			
 			debug "fin appliquer"
 			
-			debug ("---	part 1  	" +  (  ((timeStamp ()) - tmp1 ) / 1000.0)	as string  )
+			debug ("---	part 1  	" +  (  ( tmp2 - tmp1 ) / 1000.0)	as string  )
 			debug ("---	part 2  	" +  (  ( tmp3 - tmp2 ) / 1000.0)	as string  )
-			debug ("---	total  	" +  (  ((timeStamp ()) - tmp1 ) / 1000.0)	as string  )
+			debug ("---	total  	" +  (  ( tmp3 - tmp1 ) / 1000.0)	as string  )
 			
 			
 		),		
 		fn retirer =(
 			
 			debug "retirer"
-			effectif = false
 			
 			for nd in geometry do 
 				retirer_section_material 	nd
 		),
+		
+		
+		
+	public
+		fn desactiver =(
+			actif = false			
+			retirer ()		
+		),
+		fn activer 	=(
+			actif = true			
+			appliquer ()
+		),
+		
 		
 		
 		
@@ -497,7 +555,7 @@ Sectionneur		=	str_sectionneur ()
 
 
 ------ DEBUG --------------------
-Sectionneur.retirer ()
+Sectionneur.desactiver ()
 
 
 
