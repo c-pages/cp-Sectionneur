@@ -3,7 +3,7 @@ plugin material sectionneur_material
 name:"Sectionneur"
 classID:#(213452,482753)
 extends:CoronaRaySwitchMtl	 
-replaceUI:true 	
+-- replaceUI:true 	
 invisible:true
 version:1
 (
@@ -22,7 +22,13 @@ version:1
 	parameters main rollout:params	(
 		'Base material'		type:#material 						ui:btn_baseMat
 		shadows				type:#boolean			default:true 						ui:chk_shadows
+		nds_sections		type:#nodeTab 		tabSize:0  		tabSizeVariable:true
 		
+		on nds_sections	 set 	_val _index do (
+-- 			format "AJOUTER SECTION: % \n" _val
+			if blendMat == undefined do 	blendMat = Sectionneur.get_blendMat ()
+			blendMat.mask.nodes	=	for nd in nds_sections collect nd
+		)
 		on 'Base material'	 set _mat do (
 -- 			delegate.directMtl 			= _mat
 			delegate.reflectMtl 			= _mat
@@ -47,6 +53,12 @@ version:1
 		materialButton 'btn_baseMat' "None" pos:[97,5] width:202 height:16 align:#left
 		label 'lbl_baseMat' "Base material:" pos:[21,6] width:72 height:14 align:#left
 		checkbox 'chk_shadows' "Cast shadows" pos:[19,21] width:88 height:14 align:#left
+		listbox 'lbx_sections' "Sections:" pos:[20,46] width:273 height:7 align:#left
+		
+		
+		on params open  do		(
+		lbx_sections.items = for obj in nds_sections collect obj.name
+		)
 	)
 	
 	
@@ -117,7 +129,6 @@ version:1
 -- $.material 	= testMat
 
 -- test.set_baseMat  $.material
-
 
 
 

@@ -19,15 +19,19 @@
 ########################################################################################################################*/
 
 
+/* 
+delete $Sectionneur_helper*
+ */
+
 if Sectionneur != undefined do Sectionneur.fermer () 
 
 
 
-global Sectionneur	
+-- global Sectionneur	
 
 
 filein	 "$userScripts\\cp-Sectionneur\\cp - Sectionneur - Material Plugin.ms" 
-filein	 "$userScripts\\cp-Sectionneur\\cp - Sectionneur - Modifier Plugin.ms" 
+filein	 "$userScripts\\cp-Sectionneur\\cp - Sectionneur - Helper Plugin.ms" 
 
 
 
@@ -36,13 +40,6 @@ filein	 "$userScripts\\cp-Sectionneur\\cp - Sectionneur - Modifier Plugin.ms"
 ------------ DEBUG	-------------------------------------------------------------------------------------------------------------------------
 
 
-
-
------ le  plugin material  ---------------------------
--- (	
--- 	filein	 "$userScripts\\cp-Sectionneur\\cp - Sectionneur - Material Plugin.ms" 
--- 	filein	 "$userScripts\\cp-Sectionneur\\cp - Sectionneur - Modifier Plugin.ms" 
--- 	)
 
 
 
@@ -54,30 +51,36 @@ rollout roll_sectionneur "sectionneur" width:522 height:232
 	------------  Membres	----------------------------------------------------------------------------------
 	---- Pointeurs ----
 	local m_prt				---- pointeur vers la structure de controle ----
+	local nds_exclude 	= #()
+	local nds_include 	= #()		
 	
 	
 	
 	------------  UI	----------------------------------------------------------------------------------		
 	listbox 'lbx_sections' "" pos:[10,23] width:156 height:7 align:#left
-	pickbutton 'btn_section_nvNode' "Node" pos:[43,7] width:34 height:16 align:#left
+	pickbutton 'btn_section_nvNode' "+" pos:[134,7] width:16 height:16 align:#left
 -- 	button 'btn_section_nvlleBox' "Box" pos:[9,7] width:34 height:16 align:#left
-	pickbutton 'btn_section_supprimer' "Suppr." pos:[131,7] width:34 height:16 align:#left
+	button 'btn_section_supprimer' "-" pos:[149,7] width:16 height:16 align:#left
 	checkbox 'chk_ombres' "Ombres" pos:[9,121] width:117 height:15 checked:true align:#left
 	radiobuttons 'rdo_applyTo' "Apply to :" pos:[9,139] width:108 height:46 labels:#("Scene", "Nodes", "XRef") columns:2 align:#left
-	checkbutton 'btn_appliquer' "Appliquer Sections" pos:[9,189] width:156 height:34 align:#left
-	listbox 'lbx_exclude' "" pos:[181,23] width:156 height:15 align:#left
-	listbox 'lbx_include' "" pos:[354,23] width:156 height:15 align:#left
+	checkbutton 'btn_appliquer' "Activer" pos:[9,189] width:44 height:34 align:#left
+	multiListBox 'lbx_exclude' "" pos:[181,23] width:156 height:15 align:#left
+	multiListBox 'lbx_include' "" pos:[354,23] width:156 height:15 align:#left
 	button 'btn_to_include' ">" pos:[338,25] width:16 height:16 align:#left
 	button 'btn_to_exclude' "<" pos:[338,40] width:16 height:16 align:#left
 	label 'lbl_exclude' "Exclude" pos:[181,7] width:44 height:14 align:#left
 	label 'lbl_include' "Include" pos:[354,7] width:44 height:14 align:#left
 	button 'btn_selection_to_include' "+" pos:[338,65] width:16 height:16 align:#left
+	label 'lblsections' "Sections" pos:[12,7] width:44 height:14 align:#left
 	
+	button 'btn_select_ndsACouper' "Select" pos:[476,6] width:35 height:16 align:#left
+	button 'btn_select_ndsSections' "Select" pos:[98,7] width:35 height:16 align:#left
 	
+	button 'btn_creer_fichierCoupe' "Creer fichier Coupe" pos:[52,189] width:114 height:18 align:#left
 	
 	------------  Fonctions	----------------------------------------------------------------------------------	
 	fn redimensionner		=(
-		if rdo_applyTo.state  == 1 then
+		if m_prt.get_mode ()  == 1 then
 			roll_sectionneur.width = 175
 		else 
 			roll_sectionneur.width = 522
@@ -89,6 +92,11 @@ rollout roll_sectionneur "sectionneur" width:522 height:232
 		rdo_applyTo.state 		=	m_prt.get_mode ()
 		btn_appliquer.checked 	= 	m_prt.est_actif ()
 		
+		nds_exclude				=	for obj in geometry where not m_prt.est_aCouper   obj collect obj
+		lbx_exclude.items 		=	for obj in nds_exclude collect obj.name
+		nds_include					=	m_prt.get_nds_aCouper ()
+		lbx_include.items 			=	for obj in nds_include where obj != undefined collect obj.name
+		
 	)
 	
 	
@@ -96,7 +104,6 @@ rollout roll_sectionneur "sectionneur" width:522 height:232
 	fn initialiser = (
 		
 		redimensionner ()
-		
 		actualiser ()
 		
 	)
@@ -106,31 +113,61 @@ rollout roll_sectionneur "sectionneur" width:522 height:232
 
 	
 	
-	on btn_section_nvNode picked obj do	(
-				m_prt.ajouter_section	obj
-				actualiser ()	
-			)
-	on btn_section_nvlleBox pressed do
-		(
-		
-	)
-	on btn_section_supprimer picked obj do
+	on btn_section_nvNode picked obj do
 	(
-		
+			m_prt.ajouter_section	obj
+			actualiser ()	
+		)
+	on btn_section_supprimer pressed do
+	(
+			m_prt.retirer_section	lbx_sections.selection
+			actualiser ()	
 		)
 	on chk_ombres changed state do
-				m_prt.set_ombresUse	 state
-	on rdo_applyTo changed state do	(
-				m_prt.set_mode	 state
-				redimensionner ()
+		m_prt.set_ombresUse	 state
+	on rdo_applyTo changed state do
+	(
+					m_prt.set_mode	 state
+					redimensionner ()
+				)
+	on btn_appliquer changed state do
+	(
+				case state of (
+					true:		m_prt.activer 		()
+					false: 	m_prt.desactiver 	()
+				)
 			)
-	on btn_appliquer changed state do	(
-			case state of (
-				true:		m_prt.activer 		()
-				false: 	m_prt.desactiver 	()
-			)
+	on btn_to_include pressed do
+	(
+		for id_obj in ( lbx_exclude.selection as array ) do
+			m_prt.ajouter_ndAcouper	nds_exclude[id_obj]
+		actualiser ()	
+		
+	)
+	on btn_to_exclude pressed do
+	(
+			for id_obj in ( lbx_include.selection as array ) do
+				m_prt.retirer_ndAcouper	nds_include[id_obj]
+			actualiser ()	
 		)
-) ---- fin rollout -------------
+	on btn_selection_to_include pressed do
+	(
+						m_prt.ajouter_ndAcouper	(selection as array )
+						actualiser ()	
+		)
+	on btn_select_ndsACouper pressed do
+	(
+	
+		)
+	on btn_select_ndsSections pressed do
+	(
+	
+		)
+	on btn_creer_fichierCoupe pressed do
+	(
+		m_prt.creer_fichierCoupe	()
+	)
+)
 
 
 
@@ -145,13 +182,13 @@ struct str_sectionneur (
 		fn debug 	_txt  var:	 param:    =	
 			try if m_debug  do ::debuger 	_txt	prefix:"Sectionneur "	  	var:var	 param:param		catch (),
 	------------ DEBUG	-------------------------------------------------------------------------------------------------------------------------
-		
-		
-		
-		
-		
-		
-		------------  Membres	----------------------------------------------------------------------------------
+	
+	
+	
+	
+	
+	
+	------------  Membres	----------------------------------------------------------------------------------
 	private
 		--- si la coupe est active ----------------
 		actif 				= 	false,
@@ -163,14 +200,15 @@ struct str_sectionneur (
 		---- Materiau / map pour la découpe --------------
 		distMap 			= CoronaDistance (),
 		invisMat 		= CoronaMtl (),
--- 		blendMat 		= Blend (),
+		materiaux_decoupe =#(),
+		
 		
 		--- sections -----
 		sections 		=	#(),
 		
-		
-		materiaux_decoupe =#(),
-		
+		--- nodes a couper -------------
+		nds_aCouper 	=	#(),
+		hlp_sectionneur = undefined,
 		
 	private
 		
@@ -186,38 +224,127 @@ struct str_sectionneur (
 		
 		------------  Fonctions	----------------------------------------------------------------------------------
 	private
-		/* fn desactiver_prePost_rendu =(		
-			callbacks.removescripts 	id:	#sectionneur_preRender
-			callbacks.removescripts 	id:#sectionneur_postRender
-			gc()
+		
+		------ Helper Sectionneur -------------------
+		fn maj_hlp_sectionneur =(
+			
+			hlp_sectionneur.set_mode				mode
+			hlp_sectionneur.set_actif				actif
+			hlp_sectionneur.set_ndsSections	sections
+			hlp_sectionneur.set_ndsAcouper		nds_aCouper
+			
 		),
-		fn activer_prePost_rendu =(
+		fn maj_FROM_sectionneur 		_nd	=(
 			
-			desactiver_prePost_rendu ()			
-			
-			global terrains_asProxy =#()
-			local		txt_pre ="with redraw off (\n"
-			 			txt_pre +="	format \"----> callbacks 	#preRender \\n\"\n"
-						txt_pre +="	sectionneur.appliquer()\n"
-						txt_pre +=")"
-			callbacks.addscript 	#preRender 	txt_pre 		id:#sectionneur_preRender
-			
-			---- post rendu	-----------
-			local		txt_post ="with redraw off (\n"
-			 			txt_post +="	format \"----> callbacks 	#postRender \\n\"\n"
-						txt_post +="	sectionneur.retirer()\n"
-						txt_post +=")"
-			callbacks.addscript 	#postRender 	txt_post 		id:#sectionneur_postRender
-
+			mode				=	_nd.get_mode		()		
+			actif				=	_nd.get_actif 		()
+			nds_aCouper	=	_nd.get_ndsAcouper ()
+			sections			=	_nd.get_ndsSections ()
 		),
-		 */
+		fn get_sectionneur_helper	=(
+			
+			
+			local sectionneur_hlp = undefined
+			local instances_hlp	=	getclassinstances  Sectionneur_helper 
+			
+			if instances_hlp.count > 1 then 
+				for i = instances_hlp.count to 2 by -1 do 
+					deleteItem 	instances_hlp
+			else if instances_hlp.count == 0  then 
+				sectionneur_hlp = Sectionneur_helper ()
+			else
+				sectionneur_hlp = instances_hlp[1]
+			
+			maj_FROM_sectionneur 	sectionneur_hlp
+			
+			sectionneur_hlp
+		),
 		
 		
+		------------------  Accessions ------------------------------------------
+	private		
+		fn get_nodesACouper_fromScene	 =(
+			for obj in geometry		where 	 est_porteur_matACouper	obj	collect 	obj		
+		),
+		
+	public
+		fn get_nds_aCouper 		= 	for nd in nds_aCouper collect nd,	
+		fn est_actif					=	actif,
+		fn get_sections				=	for sect in sections collect sect,
+		fn set_mode	_mode		= 	(
+			mode = _mode
+			maj_hlp_sectionneur()
+		),
+		fn get_mode					= 	mode,
+		fn get_ombresUse			=	ombres_use,
+		fn set_ombresUse	_val	= with redraw off 	(
+			ombres_use = _val
+			materiaux_decoupe.shadows = ombres_use
+		),
+		fn get_blendMat 				=  (
+			local blendMat 			= Blend ()			
+			blendMat.map2			=	invisMat
+			blendMat.mask			=	distMap
+			
+			blendMat
+		),
+		fn get_objects_byMat 	_mat =(
+			for obj in geometry where obj.material == _mat	collect obj
+		),
+		
+		
+		------ divers tests ---------------------------------------
+		fn estValide_prMatSection		_nd =(
+			result = true
+			
+			if not _nd.renderByLayer	and not _nd.renderable 			then	result = false
+			else if _nd.renderByLayer	and not _nd.layer.renderable 	then	result = false			
+			else if est_section obj 													do	result = false
+			
+			result
+		),
+		fn est_porteur_matACouper		_node	=(
+			local result	=	false
+			case classOf _node.material of (
+					Multimaterial:	(
+						for i = 1 to _node.material.materialList.count	 do 
+							if classof _node.material.materialList[i] == sectionneur_material do
+							result = true
+					)
+					Blend:	(
+						if classof _node.material.map1 == sectionneur_material do
+							result = true
+						if classof _node.material.map2 == sectionneur_material do
+							result = true
+					)
+					DoubleSided:	(
+						if classof _node.material.material1 == sectionneur_material do
+							result = true
+						if classof nd.material.material2 == sectionneur_material do
+							result = true
+					)
+					sectionneur_material:			result = true
+				) -- fin case -----
+			result
+		),
+		fn est_aCouper 		_node 	=(
+			if findItem	nds_aCouper 	_node != 0 then true else false
+		),
 		fn est_section		_node =(
 			local result = false
 			if findItem sections 	_node != 0 then result = true
 			result
 		),		
+		
+		
+		
+		
+		
+		
+		
+	---------- Materiau Section	----------------------------------------------------------------------------------------------------------------
+	private
+		------- Divers ---------------------------------
 		fn preparer_materiau_section	 =(
 			
 			--- la map de distance ---------------
@@ -233,13 +360,8 @@ struct str_sectionneur (
 			invisMat 					=	CoronaMtl	name:"Section - Invisible"
 			invisMat.levelOpacity	=	0
 			
-			
 		),
-		
-		
-		
-		
-		fn retirer_section_material		_node	=(
+		fn retirer_materiau_section		_node	=(
 			
 			
 			case classOf _node.material of (
@@ -265,7 +387,7 @@ struct str_sectionneur (
 			) -- fin case -----
 			
 		),		
-		fn get_section_material		_mat	=(
+		fn get_matSection_fromMat		_mat	=(
 			
 			local result
 			
@@ -275,7 +397,8 @@ struct str_sectionneur (
 					
 					for i = 1 to _mat.materialList.count	 do (
 						--- on applique le materiau Section -------------
-						local mat_section 				= 	sectionneur_material ()				
+						local mat_section 				= 	sectionneur_material ()
+						mat_section.nds_sections		=	get_sections ()
 						mat_section.'Base material' 	=	_mat.materialList[i]
 						multiMat.materialList[i]			= 	mat_section
 						append materiaux_decoupe 	mat_section
@@ -286,13 +409,15 @@ struct str_sectionneur (
 					local blendMat	=	Blend ()
 					
 					--- on applique le materiau Section -------------
-					local mat_section 				= 	sectionneur_material ()				
+					local mat_section 				= 	sectionneur_material ()		
+						mat_section.nds_sections		=	get_sections ()		
 					mat_section.'Base material' 	=	_mat.map1
 					blendMat.map1					= 	mat_section
 						append materiaux_decoupe 	mat_section
 				
 					--- on applique le materiau Section -------------
-					local mat_section 				= 	sectionneur_material ()				
+					local mat_section 				= 	sectionneur_material ()		
+						mat_section.nds_sections		=	get_sections ()		
 					mat_section.'Base material' 	=	_mat.map2
 					blendMat.map2					= 	mat_section
 						append materiaux_decoupe 	mat_section
@@ -303,13 +428,15 @@ struct str_sectionneur (
 					local dbleSideMat	=	DoubleSided ()
 					
 					--- on applique le materiau Section -------------
-					local mat_section 				= 	sectionneur_material ()				
+					local mat_section 				= 	sectionneur_material ()		
+						mat_section.nds_sections		=	get_sections ()		
 					mat_section.'Base material' 	=	_mat.material1
 					dbleSideMat.material1			= 	mat_section
 						append materiaux_decoupe 	mat_section
 				
 					--- on applique le materiau Section -------------
-					local mat_section 				= 	sectionneur_material ()				
+					local mat_section 				= 	sectionneur_material ()		
+						mat_section.nds_sections		=	get_sections ()		
 					mat_section.'Base material' 	=	_mat.material2
 					dbleSideMat.material2			= 	mat_section
 						append materiaux_decoupe 	mat_section
@@ -319,50 +446,203 @@ struct str_sectionneur (
 				)
 				default:			(
 					--- on applique le materiau Section -------------
-					local mat_section 				= sectionneur_material ()				
-					mat_section.'Base material' 	=	_mat
+					local mat_section 				= sectionneur_material ()		
+						mat_section.nds_sections		=	get_sections ()		
+					mat_section.'Base material' 	=	copy _mat
+					mat_section.'Base material'.name	=	_mat.name
 					result 								= mat_section
-						append materiaux_decoupe 	mat_section
+					append materiaux_decoupe 	mat_section
 				)
 			)
 			result
 		),
 		
-		
-		
-		
-		------------  Interface	----------------------------------------------------------------------------------
-	public		
-		fn est_actif					=	actif,
-		fn get_sections				=	for sect in sections collect sect,
-		fn set_mode	_mode		= 	mode = _mode,
-		fn get_mode					= 	mode,
-		fn get_ombresUse			=	ombres_use,
-		fn set_ombresUse	_val	= with redraw off 	(
-			ombres_use = _val
-			materiaux_decoupe.shadows = ombres_use
-		),
-		fn get_blendMat 				=  (
-			--- le blend --------------------------
-			local blendMat 			= Blend ()			
-			blendMat.map2			=	invisMat
-			blendMat.mask			=	distMap
+		------- Appliquer / retirer ---------------------------------
+		fn appliquer_matSection =  with undo off with redraw off (
 			
-			blendMat
+			debug "appliquer_matSection"
+			
+			--- Progress bar ---------------------------
+			local tmp1 = timeStamp ()
+			local compteur = 0.
+			progressStart ( "Creation des texture de decoupe" )
+			
+			
+			----- Analyses ----------------------------------------
+			materiaux_decoupe 			= #()
+			local mats_aRemplacer		=	#()
+			local nds_sansMat			=	#()
+			for obj in geometry	where not est_section obj do (
+				if  obj.material != undefined then
+					appendIfUnique	mats_aRemplacer		obj.material
+				else
+					append nds_sansMat	obj
+			)
+			
+			
+			local tmp2 = timeStamp ()
+			debug ("---	Analyses  	" +  (  ( tmp2 - tmp1 ) / 1000.0)	as string  + " s." )
+			
+			----- objets sans materiaux ----------------------------
+			if nds_sansMat.count > 0 do (
+				local appliquer_mat	=	queryBox	"Il y a des objects sans materiaux dans la scene.\nLes objets onts besoin d'un materiaux pour être coupé.\nVoulez-voux appliquer_matSection un materiaux Corona de base ?"
+				if appliquer_mat do (
+					debug "appliquer_matSection MATERIAUX de base."
+				)
+			)
+			
+			
+			
+			local tmp3 = timeStamp ()
+			debug ("---	objets sans materiaux   	" +  (  ( tmp3 - tmp2 ) / 1000.0)	as string  + " s." )
+			
+			
+			
+			---- on regarde quelles nodes ca concerne pour determiner à quel nodes on applique ------------------
+			local nodes_aCouper =#()
+			
+			
+			case mode of(
+				1: ( ------------------------------------- SCENE -------------------------------------
+-- 						local mats = for mat in sceneMaterials collect mat
+					
+						debug "mats_aRemplacer" var:mats_aRemplacer		param:#name
+					
+						for mat in mats_aRemplacer	do (
+							
+							--- Progress bar ---------------------------
+							compteur += 1.
+							progressUpdate 	( compteur  / mats_aRemplacer.count * 100 )
+							
+-- 							debug "\ncompteur"	var:compteur
+-- 							debug "( compteur  / mats.count * 100 )" var:( compteur  / mats_aRemplacer.count * 100 )
+							
+							local mat_section 		= get_matSection_fromMat 	mat
+							replaceinstances		mat		mat_section
+							
+						)
+						
+					
+					
+				) --- fin 1		: scene-----------------------------
+				
+				
+				
+				
+				
+				
+				2:	( ------------------------------------- NODES -------------------------------------
+					nodes_aCouper = get_nds_aCouper ()
+					
+					local nodes_aTraiter = for nd in  nodes_aCouper collect nd
+					
+					
+					---- on fait  des listes  d'objets regroupés par materiaux ----------------
+					while nodes_aTraiter.count>0	 /* and compteur < 200 */  do (
+						
+						
+						--- Progress bar ---------------------------
+						compteur += 1
+						local progress_val 	= ( ( nodes_aCouper.count as float ) - ( nodes_aTraiter.count  as float ) ) 
+						progress_val 			= progress_val  / nodes_aCouper.count * 100
+						progressUpdate 	progress_val
+						
+						
+						
+						local nd 			= nodes_aTraiter[	1	]
+						
+						if nd.material  != undefined then (
+							
+							---- DEBUG IF TRUE -------------------
+							if false then (
+		-- <Sectionneur >	---	total  	69.782 s.
+								nd.material	=	get_matSection_fromMat 	nd.material
+								deleteItem nodes_aTraiter 1
+							) else (
+							---- DEBUG BACK -------------------
+								local ids_aSupprimer 	= #{}
+								local	objs_memeMat 	= for i = 1 to nodes_aTraiter.count where 	 nodes_aTraiter[i].material == nd.material  	collect  ( ids_aSupprimer[i] = true; nodes_aTraiter[i] )
+			-- 					replaceInstances 
+								
+								local mat_section 		= get_matSection_fromMat 	nd.material
+		-- 						replaceinstances	nd.material	mat_section
+								objs_memeMat.material = mat_section
+								
+								for i = (ids_aSupprimer as array).count to 1 by -1 do 
+									deleteItem nodes_aTraiter 	( ( ids_aSupprimer) as array)[i]
+							)
+							
+						) else (	
+							
+							
+							local mat_section 	= get_matSection_fromMat 	( Sectionneur_undefined_mat 	name:"Sectionneur_undefined_mat"		color:nd.wirecolor )
+							nd.material 			= mat_section
+							
+							deleteItem nodes_aTraiter 1
+							
+						)
+						
+					)
+					
+				)
+				3: (--- Xrefs ---
+					
+				)
+			)
+			
+			
+			---- TRICK pour cleaner le scenesMaterials :		on sauvegarde un fichier vide -----------
+			saveNodes #() (getdir #temp + "\\back.bak") quiet:on
+			
+			
+			
+			
+			
+			
+			local tmp4 = timeStamp ()
+			debug ("---	appliquer_matSection les mats  	" +  (  ( tmp4 - tmp3 ) / 1000.0)	as string  + " s." )
+			
+			progressEnd() 
+			
+			debug "fin appliquer_matSection"
+			debug ("---	total  	" +  (  ( tmp4 - tmp1 ) / 1000.0)	as string  + " s." )
+
+			
+-- 			debug ("---	part 1  	" +  (  ( tmp2 - tmp1 ) / 1000.0)	as string  )
+-- 			debug ("---	part 2  	" +  (  ( tmp3 - tmp2 ) / 1000.0)	as string  )
+-- 			debug ("---	total  	" +  (  ( tmp3 - tmp1 ) / 1000.0)	as string  )
+			
+			
+		),		
+		fn retirer_matSection =(
+			
+			debug "retirer_matSection"
+			
+			--- Progress bar ---------------------------
+			local compteur = 0.
+			progressStart ( "Suppression des texture de decoupe" )
+			
+			for nd in geometry do (
+				
+				--- Progress bar ---------------------------
+				compteur += 1.
+				progress_val 		= compteur  / geometry.count * 100
+				progressUpdate 	progress_val
+				
+				retirer_materiau_section 	nd
+				
+			)
+			progressEnd() 
 		),
 		
 		
-		fn estValide_prMatSection		_nd =(
-			result = true
-			
-			if not _nd.renderByLayer	and not _nd.renderable 			then	result = false
-			else if _nd.renderByLayer	and not _nd.layer.renderable 	then	result = false			
-			else if est_section obj 													do	result = false
-			
-			result
-		),
 		
-		fn ajouter_section			_node 	=(
+		
+		
+	------------  Interface	----------------------------------------------------------------------------------------------------------------
+	public
+		--- Sections -------------------
+		fn ajouter_section			_node 	= if _node != hlp_sectionneur	do	(
 			
 			---- on retire les node deleted -------------
 			local id_deleted =#()
@@ -372,6 +652,9 @@ struct str_sectionneur (
 			for i = id_deleted.count to 1 by -1 do
 				deleteItem sections  id_deleted[i]
 			
+			-- on le retire des nodes a couper si besoin --------
+			if est_aCouper _node do
+				this.retirer_ndAcouper	_node
 			
 			---- on so'ccupe de notre section ----------
 			_node.material = undefined
@@ -385,154 +668,101 @@ struct str_sectionneur (
 			appendIfUnique  sections		_node
 			distMap.nodes = sections
 			
+			maj_hlp_sectionneur ()
+			
+		),
+		fn retirer_section		id_aSuppr	 =(
+			if id_aSuppr != 0 do
+				deleteItem	sections	id_aSuppr
+			
+			maj_hlp_sectionneur ()
+			
 		),
 		
-		
-		fn get_objects_byMat 	_mat =(
-			for obj in geometry where obj.material == _mat	collect obj
-		),
-		
-		----------------------------------------------------------------------------
-	private
-		
-		
-		fn appliquer =  (
-			
-			debug "appliquer"
-			materiaux_decoupe = #()
-			--- Progress bar ---------------------------
-			local compteur = 0
-			progressStart ( "Creation des texture de decoupe" )
-			
-			local tmp1 = timeStamp ()
-			
-			---- on regarde quelles nodes ca concerne pour determiner à quel nodes on applique ------------------
-			local nodes_aCouper =#()
-			case mode of(
-				1: ( --- Scene ---
-					nodes_aCouper = geometry as array	--for obj in geometry	  	collect obj	
-				)
-				2:	( --- nodes ---
-				
-				)
-				3: ( --- layers ---
-					
-				)
-				4: ( --- Xrefs ---
-					
-				)
-			)
+		--- Noeud cibles   -------------------
+		fn ajouter_ndAcouper		_nodes	=(
 			
 			
-			debug "----->nodes_aCouper" 	var:nodes_aCouper 	param:#name
-			
-			local tmp2 = timeStamp ()
-			local nodes_aTraiter = for obj in nodes_aCouper where	not est_section	obj	 collect obj
-			
-			---- on fait  des listes  d'objets regroupés par materiaux ----------------
--- 			local ids_obj_aTraiter = #{1..nodes_aCouper.count}
-			while nodes_aTraiter.count>0	 /* and compteur < 200 */  do (
+			if classof _nodes != array do
+				_nodes = #(_nodes)
+			for nd in _nodes where superclassof nd == GeometryClass and 	not est_section nd	do (
 				
+				-- on le retire des nodes a couper si besoin --------
+				if est_section	 nd do
+					this.retirer_section	_node
 				
-			local tmpA_1 = timeStamp ()
-				--- Progress bar ---------------------------
-				compteur += 1
-				local progress_val 	= ( ( nodes_aCouper.count as float ) - ( nodes_aTraiter.count  as float ) ) 
-				progress_val 			= progress_val  / nodes_aCouper.count * 100
-				progressUpdate 	progress_val
-				
-				
-				
-				
-				local nd 			= nodes_aTraiter[	1	]
-				
-
-					debug "\n\n----->nd" var:nd param:#name	
-					debug "----->nd.material" var:nd.material param:#name		
--- 					debug "----->nodes_aTraiter" var:nodes_aTraiter param:#name	
-					debug "----->nodes_aTraiter COUNT" var:nodes_aTraiter.count
-
-			local tmpA_2 = timeStamp ()
-			debug ("---	A 1 : " +  (  ( tmpA_2- tmpA_1 ) / 1000.0)	as string  )
-				
-				if nd.material  != undefined then (
-					
--- 				local objs_memeMat = #(  nd )
-					local ids_aSupprimer 	= #{}
-					local	objs_memeMat 	= for i = 1 to nodes_aTraiter.count where 	 nodes_aTraiter[i].material == nd.material  	collect  ( ids_aSupprimer[i] = true; nodes_aTraiter[i] )
-					
-			local tmpA_3 = timeStamp ()
-			debug ("---	A 2 : " +  (  ( tmpA_3- tmpA_2 ) / 1000.0)	as string  )
-					
-					
-					local mat_section 		= get_section_material 	nd.material
-					
-			local tmpA_4 = timeStamp ()
-			debug ("---	A 3 : " +  (  ( tmpA_4- tmpA_3 ) / 1000.0)	as string  )
-					
-					objs_memeMat.material = mat_section
-					
-					debug "----->objs_memeMat" var:objs_memeMat param:#name
-					
-			local tmpA_5 = timeStamp ()
-			debug ("---	A 4 : " +  (  ( tmpA_5- tmpA_4 ) / 1000.0)	as string  )
-					
-					for i = (ids_aSupprimer as array).count to 1 by -1 do 
-						deleteItem nodes_aTraiter 	( ( ids_aSupprimer) as array)[i]
-					
-					
-			local tmpA_6 = timeStamp ()
-			debug ("---	A 4 : " +  (  ( tmpA_6- tmpA_5 ) / 1000.0)	as string  )
-					
-				) else (	
-					
-					local mat_section 	= get_section_material 	( Sectionneur_undefined_mat 	name:"Sectionneur_undefined_mat"		color:nd.wirecolor )
-					nd.material 			= mat_section
-					
-					deleteItem nodes_aTraiter 1
-					
-				)
+				appendIfUnique	nds_aCouper	nd
 				
 			)
 			
-			local tmp3 = timeStamp ()
+			maj_hlp_sectionneur ()
 			
-			progressEnd() 
+		),
+		fn retirer_ndAcouper		_node =(
+			local id_aSuppr = findItem	nds_aCouper 	_node
+			if id_aSuppr != 0 do
+				deleteItem	nds_aCouper	id_aSuppr
 			
-			debug "fin appliquer"
+			maj_hlp_sectionneur ()
 			
-			debug ("---	part 1  	" +  (  ( tmp2 - tmp1 ) / 1000.0)	as string  )
-			debug ("---	part 2  	" +  (  ( tmp3 - tmp2 ) / 1000.0)	as string  )
-			debug ("---	total  	" +  (  ( tmp3 - tmp1 ) / 1000.0)	as string  )
-			
-			
-		),		
-		fn retirer =(
-			
-			debug "retirer"
-			
-			for nd in geometry do 
-				retirer_section_material 	nd
 		),
 		
 		
 		
+		------  Activater / desactiver ----------------------------------------------------------------------
 	public
 		fn desactiver =(
-			actif = false			
-			retirer ()		
+			actif = false
+			maj_hlp_sectionneur()
+			retirer_matSection ()
 		),
 		fn activer 	=(
-			actif = true			
-			appliquer ()
+			actif = true
+			maj_hlp_sectionneur()
+			appliquer_matSection ()
 		),
 		
+		
+		
+		----- fichier ----------
+		fn creer_fichierCoupe 		=(
+			
+			if maxFileName == undefined then (
+				messagebox "enregistrer votre fichier d'abord !"
+				
+			) else with  undo off with redraw off  (
+				
+				--- ?  Faire un hold ? ----------
+				
+				----- Activer la coupe si besoin -----------------------
+				local actifBack = actif
+				if not actifBack do activer ()
+				
+				----- Enregistrer le fichier  -----------------------
+				local nom_fichierCoupe	=	maxFilePath + getFilenameFile  maxFileName + " - Coupe.max"
+				saveMaxFile 	nom_fichierCoupe		useNewFile:false		clearNeedSaveFlag:false		quiet:true
+				
+				
+				--- ? et donc un fetch ici ?  sinon on desactive tout ----------				
+				----- Desactiver la coupe si besoin -----------------------
+				if not actifBack do desactiver ()		
+				actif	= actifBack
+				
+			)  
+			
+		),
 		
 		
 		
 		
 		---- fenetre ------------------------------------------------------------------------------
 		fn ouvrir =(			
+			
+-- 			nds_aCouper = get_nodesACouper_fromScene ()
+			
+			hlp_sectionneur	=	get_sectionneur_helper ()
+			maj_FROM_sectionneur		hlp_sectionneur
+			
 			createDialog dialog 	pos:					dialog_pos
 			dialog.m_prt	 	= this
 			dialog.initialiser ()
@@ -549,647 +779,10 @@ struct str_sectionneur (
 		
 ) --- fin struct ----------------------------------
 
--- format "BAH ALORS \n"
 
+
+---- declaration du manager de scetions ----------------
 Sectionneur		=	str_sectionneur ()
-
-
------- DEBUG --------------------
-Sectionneur.desactiver ()
-
-
-
--- Sectionneur.creer_ombres_objets ()
--- Sectionneur.supprimer_ombres_objets ()
-
-
-
-
-/* 
-
-struct str_section	(
-	
-	
-	
-	
-	------------ MEMBRES	-------------------------------------------------------------------------------------------------------------------------
-	private
-		
-		---- constantes	-----------------------------------------
-		decallage_decoupe		=	10,
-		
-		
-		---- la scene ---------------------------------------------
-		sceneACouper_fichier			=	"",
-		sceneACouper_nds				=	#(),
-		sceneACouper_mats_noms		=	#(),
-		
-		
-		---- les echantillons de materiau ---------------------------------------------
-		echantillons_mats		=	#(),
-		echantillons_nds			=	#(),
-		
-		
-		---- parametres de découpe ---------------------------
-		decoupe_nds				=	#(),
-		decoupe_axe				=	#Z_positif,				------		#X_positif,	#X_negatif,		#Y_positif,	#Y_negatif,		#Z_positif,	#Z_negatif		-------------
-		decoupe_ht					=	10.,
-		decoupe_couleur			=	color 50 50 255,
-		
-		--- l'objet de decoupe	---------------------------------
-		sectionneur_nd					=	undefined,
-		distMap			=	CoronaDistance(),
-		sectionneur_matInv			=	CoronaMtl(),
-		
--- 		--- l'objet de la section créée	---------------------------------
--- 		section_nd					=	undefined,
--- 		section_mat				= CoronaMtl (),
-		
-		
-	------------ FONCTIONS	-------------------------------------------------------------------------------------------------------------------------	
-	private 
-		----------------	 divers	------------------------------------------------
-		fn 	get_BB_scene 	=	(
-			
-			local result = #( [1e14,1e14,1e14] , [-1e14,-1e14,-1e14] )
-			
-			for obj in geometry do (
-				local BB_obj	=	nodeGetBoundingBox 	obj (matrix3 1)	
-				--- min --
-				if BB_obj[1].x	< result[1].x	do	result[1].x	= BB_obj[1].x
-				if BB_obj[1].y	< result[1].y	do	result[1].y	= BB_obj[1].y
-				if BB_obj[1].z	< result[1].z	do	result[1].z	= BB_obj[1].z
-				--- max ---
-				if BB_obj[2].x	> result[2].x	do	result[2].x	= BB_obj[2].x
-				if BB_obj[2].y	> result[2].y	do	result[2].y	= BB_obj[2].y
-				if BB_obj[2].z	> result[2].z	do	result[2].z	= BB_obj[2].z
-			)
-			
-			result
-			
-		),
-		fn		verifier_sauvegarde_necessaire	=(			
-			---	renvois true si on continue et false si l'operation est annuler --------------
-			local result = true 
-			if getSaveRequired() do (
-				local demande_sauvegarde = yesNoCancelBox "La scène à été modifée. Enregistrer les modifications?" 
-				case  demande_sauvegarde of (
-					#cancel:	result = false
-					#yes:		saveMaxFile 	(maxFilePath + maxFileName)
-				)
-			)
-			result
-		),
-		
-		
-		fn 	nomUnique_mat	mat	=	(
-			
-			debug "nomUnique_mat" var:mat.name
-			
-			local mats_noms		= 	for mt in sceneMaterials where mt != mat	collect mt.name 
-			debug "	---->  mats_noms" var:mats_noms
-
-			local nom_existe		=	findItem mats_noms		mat.name	!= 0 
-			debug "	---->  nom_existe" var:nom_existe
-			mats_noms
-			if nom_existe do (
-				mat.name += "+"	
-				nomUnique_mat	mat
-			)
-		),
-		
-		fn 	nomUnique_materiauxScene	=(
-			for mat in sceneMaterials do
-				nomUnique_mat  mat
-		),
-		
-		
-		----------------  sectionneur et section	--------------------------------------
-
-		fn 	preparer_sectionneur 	=	(
-			
-			--- creation de l'objet	----------
-			local BB_scene			=	get_BB_scene ()
-			local sectionneur_taille		=	point3 ( BB_scene[2].x - BB_scene[1].x + 2*decallage_decoupe )		( BB_scene[2].y - BB_scene[1].y  + 2*decallage_decoupe )			( BB_scene[2].z - BB_scene[1].z  + 2*decallage_decoupe )
-			local sectionneur_pos		=	BB_scene[1]	+	point3 (  sectionneur_taille.x/2 )		(  sectionneur_taille.y/2  )		(  sectionneur_taille.z/2  )	-	[ 1,1,1 ] *  decallage_decoupe  
-			sectionneur_nd					=	box pos:sectionneur_pos		lengthsegs:1 widthsegs:1 heightsegs:1 	length:sectionneur_taille.y	 width:sectionneur_taille.x	height:sectionneur_taille.z	name:"Decoupe"
-			
-			---- display viewport de l'objet	----------
-			sectionneur_nd.displayByLayer  	= false
-			sectionneur_nd.renderByLayer  	= false
-			sectionneur_nd.boxMode 			= true
-			sectionneur_nd.renderable  		= false
-			
-			--- positionnement pour la decoupe -------------------
-			sectionneur_nd.pos.z	=	decoupe_ht
-			
-		),
-		
-		
-		----------------  echantillons	--------------------------------------		
-		fn 	creer_echantillon_materiau		mat 	=(
-			
-			debug "creer_echantillon_materiau"
-			
-			
-			debug "mat.name"	var:mat.name
-			
-			
-			if appendIfUnique 	echantillons_mats 	mat		do (
-			
-				local nbre_echantillons		=	($Echantillon_*).count
-				local echantillon_nd 		= plane	length:1. width:1.	pos:[nbre_echantillons,0,0]  lengthsegs:1 widthsegs:1	name:(uniqueName "Echantillon_")
-				
-				echantillon_nd.material 				= mat
-				echantillon_nd.renderByLayer  	= false
-				echantillon_nd.renderable  		= false
-				hide 	echantillon_nd
-				
-			)
-		),
-		fn 	creer_echantillons 	mat	= (
-			
-			--- si l'objet a un materiau ------------
-			if mat != undefined then (
-				case classof mat of (
-					Multimaterial:		for subMat in mat.materialList do 
-												creer_echantillon_materiau 	subMat	
-					Blend:			(
-											creer_echantillon_materiau 		mat.map1
-											creer_echantillon_materiau 		mat.map2
-					)
-					DoubleSided:	(
-											creer_echantillon_materiau 		mat.material1
-											creer_echantillon_materiau 		mat.material2
-					)
-					default:				creer_echantillon_materiau		mat
-				)
-			) else (
-				--- sinon, on doit gerer un materiau si on veut le couper------------
-				
-			)
-		),
-		fn 	preparer_echantillons 		=(
-			debug "preparer_echantillons"
-			
-			--- on s'assure qu'il n 'y a pas de noms de materiaux en double -------
-			nomUnique_materiauxScene()
-			
-			
-			echantillons_mats		=	#()
-			delete $Echantillon_*
-			
-			for obj in geometry do 
-				creer_echantillons 	obj.material
-			
-		),
-		
-		
-		fn appliquer_decoupe 	_matXref 	=(
-			
-			debug "appliquer_decoupe ***********************"
-			local mat_decoupe	=	blend	name:"Decoupe"
-			mat_decoupe.map1	=	_matXref
-			mat_decoupe.map2	=	sectionneur_matInv
-			mat_decoupe.mask	=	distMap
-			
-			mat_decoupe
-		),
-		
-		
-		----------------  les materiaux des objets découpés		--------------------------------------
-		fn 	preparer_materiaux_decoupes	_nds	=(
-			--- 
-			--- limitation de corona: pour l'instant on ne peut pas mettre un multi sub objects dans un blend, ce qui permetterais de mettre directment le mat Xref d'un multiSub dans le blend et ainsi le garde en reference-
-			--- du coup là on est obligé de manipuler les mateiraux eux meme, du coup à chaque modifs de la scene d'origine on devra faire une maj de la decoupe ....
-			
-			
-			
-			
-			
-			--- la map de distance ---------------
-			distMap						=	CoronaDistance		name:"Distance opacity"
-			distMap.nodes				=	#( sectionneur_nd )
-			distMap.colorNear		=	black
-			distMap.colorFar			=	black
-			distMap.colorInside		=	white
-			distMap.useInside		=	true
-			distMap.distanceNear	=	0.
-			distMap.distanceFar		=	0.
-			
-			--- le materiau invisible -------
-			sectionneur_matInv 						=	CoronaMtl	name:"Invisible"
-			sectionneur_matInv.levelOpacity		=	0
-			
-			
-			---- on s'occupe des echantillons	----------------------------------------------------
-			--- les echantillons ------------
-			echantillons_nds			=	$Echantillon_*			
-			select echantillons_nds
-			for echantillon in echantillons_nds do (
-				
-				-- on cherche les objets de la scene portant le meme materiau	----------
-				local objs_mm_mat	=	for obj in _nds where  obj.material == echantillon.material collect obj
-				
-				local mat_origine_nom = echantillon.material.name
-				
-				--- on applique la decoupa au materiau xref	----------
-				echantillon.material 		= appliquer_decoupe		echantillon.material
-				
-				--- on applique le materiaux aux objets	----------
-				for obj in objs_mm_mat do
-					obj.material = echantillon.material 
-				
-			
-			)
-			
-			--- on applique dans les materaux composés -----------
-			
-			
-			mat_xref_multi = 	for  mat	in 	sceneMaterials	where  mat != undefined and classof mat == XRef_Material and  classof 	mat.overrideMaterial == Multimaterial collect mat
-			
-			
-			
-			for mat_Xref in mat_xref_multi do (
-				
--- 				if mat_Xref != undefined and classof mat_Xref == XRef_Material  then (
-					local mat_origine  = mat_Xref.overrideMaterial	
-					case classof  mat_origine of (
-						Multimaterial:		(
-							
-							-- on cherche les objets de la scene portant le meme materiau	----------
-							local objs_mm_multiMat	=	for obj in _nds where  obj.material == mat_Xref collect obj
-			
-							local nv_multiMat = Multimaterial 	numsubs:mat_origine.numsubs
-							
-							for i = 1 to   mat_origine.materialList.count do (
-								
-								local submat = mat_origine.materialList[i]
-								local trouve = false
-								for  j = 1 to echantillons_nds.count  do (
-									local echantillon_mat = echantillons_nds[j].material
-									if submat.name == echantillon_mat.map1.name do  (
-										nv_multiMat[i]	=	echantillon_mat
-										trouve = true
-									)
-								)
-								
-								if not trouve do
-									nv_multiMat[i]	 = mat_origine[i]
-								
-							)
-							
--- 							obj.material = nv_multiMat
-							
-							--- on applique le materiaux aux objets	----------
-							for obj in objs_mm_multiMat do
-								obj.material = nv_multiMat
-							
-						)
-						Blend:			(
-	-- 											creer_echantillon_materiau 		mat.map1
-	-- 											creer_echantillon_materiau 		mat.map2
-						)
-						DoubleSided:	(
-	-- 											creer_echantillon_materiau 		mat.material1
-	-- 											creer_echantillon_materiau 		mat.material2
-						)
-						default:			()	--	obj.material = appliquer_decoupe		mat_Xref
-					)
-				) 
-			
-			
-			
-			
-			
-			
-		),
-	
-		
-		
-		----------------  la scene d'origne	--------------------------------------
-		fn 	preparer_sceneACouper	=(
-			
-			
-			-------------- On s'occupe des infos necessaires ----------------------------------------
-			---- les infos de la scene à couper	-------------
-			sceneACouper_nds_noms		=		getMAXFileObjectNames 	sceneACouper_fichier
-			
-			--- on reset la scene -----------------------------------------------------
-			resetMaxFile	#noPrompt
-			
-			--- on import les Xrefs objects	-------------------------------------
-			xrefs.addNewXRefObject 	sceneACouper_fichier	sceneACouper_nds_noms		 dupMtlNameAction:#prompt
-			
-			---- les infos de la découpe	-------------
-			decoupe_nds						=		geometry as array
-			
-		
-		),
-		
-		
-		
-		fn 	preparer_noeudsADecouper	=	(
-			--- si besoin on reference tout pour garder la partie coupé en invisible au rendu (mais projetant des ombres --------
-			
-			---- on applique à chaque objet un edit_poly et on coupe la partie en trop -------------------
-			for obj in geometry do (
-				local mod_decoupe	=	edit_poly ()
-				addmodifier	 obj	mod_decoupe
-			)
-			
-			
-			
-		),
-		
-		
-		
-		
-	------------ INTERFACE	-------------------------------------------------------------------------------------------------------------------------
-	public
-		fn 	couper	=(
-			
-			---- les echantillons des materieux --------------
-			---- a sauvegarde ailleurs que dans le fichier d'origne !!! -------------
-			
-			debug " PAR LA # 1"
-			preparer_echantillons  ()
-			
-			debug " PAR LA # 2"
-			sceneACouper_fichier			=		maxFilePath + ( getFilenameFile   maxFileName ) + " - DEBUG.max"	
-			
-			debug " PAR LA # 3"
-			----	/!\		on sauvegarde	(pour avoir les echantiomllons)	/!\		----------------
-			saveMaxFile 	sceneACouper_fichier
-			
-			debug " PAR LA # 4"
--- 			-------------- On bascule dans la scene de découpe	 ----------------------------------------
-			preparer_sceneACouper ()
-			
-			debug " PAR LA # 5"
-			--- DEBUG pour y voir quelque chose dans la scene -----------
-			renderpresets.LoadAll	0 	"C:\\Users\\kris\\Documents\\3dsMax\\renderpresets\\caf.rps"
-			max zoomext sel
-			--- DEBUG pour y voir quelque chose dans la scene -----------
-			
-			
-			debug " PAR LA # 6"
-			
-			---- on prepare les noeuds à decoupr	--------------
-			
-			debug "preparer_sceneACouper"
-			
-			--- creation du double pour occultation par decoupés ------------------
-			local nds_sources = for obj in geometry where obj != sectionneur_nd collect obj
-			for nd_src in nds_sources do (
-				if nd_src.renderable and not nd_src.isNodeHidden  do (
-					local  nd_dest 				= instance	nd_src
-					nd_dest.renderByLayer  	= false
-					nd_dest.primaryVisibility 	= false
-				)
-			)
-			
-			debug " PAR LA # 7"
-			preparer_sectionneur ()
-			
-			debug " PAR LA # 8"
-			preparer_materiaux_decoupes 		nds_sources
-			
-			debug " PAR LA # 9"
-		)
-	
-)
- */
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/*
--------------------------------  XREF	--------------------------------
-show objXRefMgr 
-xrefs.addNewXRefObject "C:\\Users\\kris\\Documents\\3dsMax\\scenes\\boolean - distance map.max"
-
-maxfilename
-"boolean - distance map.max"
-sceneName = maxFilePath + maxFileName
-
-
-
-------------- MATERIAUX -----------------------------------------------------------------
-Xrefmat = $.material
-coromat = Xrefmat.overrideMaterial
-
-
-------- xref mat ------------------------
-XRef_Material
-enableOverride
-overrideMaterial 
-srcFileName
-srcItemName : string
-xrefRecord : Interface
-unresolved : bool
-nested : bool
-retargetable
-
-
-------- opacité ------------------
-CoronaMtl
-texmapOpacity
-colorOpacity
-levelOpacity
-texmapOnOpacity
-mapamountOpacity
-legacyColoredOpacity
-opacityCutout
-
-
-
------- distance map ---------------
-CoronaDistance
-nodes
-colorNear
-colorFar
-colorInside
-distanceNear
-distanceFar
-
-
-
-
-
- MAT CORONA ---
- CoronaMtl
-   .colorDiffuse : RGB color
-  .colorReflect (colorReflection) : RGB color
-  .colorRefract (colorRefraction) : RGB color
-  .colorOpacity : RGB color
-  .colorTranslucency : RGB color
-  .colorSelfIllum (colorSelfIllumination) : RGB color
-  .levelDiffuse : float
-  .levelReflect : float
-  .levelRefract : float
-  .levelOpacity : float
-  .levelTranslucency : float
-  .levelSelfIllum (multiplierSelfIllumination) : float
-  .texmapDiffuse : texturemap
-  .texmapReflect : texturemap
-  .texmapReflectGlossiness : texturemap
-  .texmapRefract : texturemap
-  .texmapRefractGlossiness : texturemap
-  .texmapOpacity : texturemap
-  .texmapBump : texturemap
-  .texmapTranslucency : texturemap
-  .texmapReflectAnisotropy : texturemap
-  .texmapReflectAnisotropyRotation : texturemap
-  .texmapIor : texturemap
-  .texmapFresnelIor : texturemap
-  .texmapDisplace (texmapDisplacement) : texturemap
-  .texmapReflectBgOverride : texturemap
-  .texmapRefractBgOverride : texturemap
-  .texmapSelfIllum (texmapSelfIllumination) : texturemap
-  .texmapOnDiffuse : boolean
-  .texmapOnReflect : boolean
-  .texmapOnRefract : boolean
-  .texmapOnReflectGlossiness : boolean
-  .texmapOnRefractGlossiness : boolean
-  .texmapOnOpacity : boolean
-  .texmapOnBump : boolean
-  .texmapOnTranslucency : boolean
-  .texmapOnAnisotropy (texmapOnReflectAnisotropy) : boolean
-  .texmapOnAnisotropyRotation (texmapOnReflectAnisotropyRotation) : boolean
-  .texmapOnIor : boolean
-  .texmapOnFresnelIor : boolean
-  .texmapOnDisplacement : boolean
-  .texmapOnReflectBgOverride : boolean
-  .texmapOnRefractBgOverride : boolean
-  .texmapOnSelfIllum (texmapOnSelfIllumination) : boolean
-  .mapamountDiffuse : float
-  .mapamountReflect : float
-  .mapamountRefract : float
-  .mapamountReflectGlossiness : float
-  .mapamountRefractGlossiness : float
-  .mapamountOpacity : float
-  .mapamountBump : float
-  .mapamountTranslucency : float
-  .mapamountAnisotropy (mapamountReflectAnisotropy) : float
-  .mapamountAnisotropyRotation (mapamountReflectAnisotropyRotation) : float
-  .mapamountIor : float
-  .mapamountFresnelIor : float
-  .mapamountSelfIllum (mapamountSelfIllumination) : float
-  .reflectGlossiness : float
-  .refractGlossiness : float
-  .fresnelIor : float
-  .ior : float
-  .absorptionDistance (absorptionDistnace) : worldUnits
-  .absorptionColor : RGB color
-  .bsdf : integer
-  .anisotropy (reflectAnisotropy) : float
-  .anisotropyRotation (reflectAnisotropyRotation) : float
-  .alphaMode (alphaChannel) : integer
-  .gBufferOverride (gBufferIdOverride) : integer
-  .displacementMinimum (displacementMinLevel) : worldUnits
-  .displacementWaterLevel : float
-  .displacementMaximum (displacementMaxLevel) : worldUnits
-  .thin (thinNoRefraction) : boolean
-  .caustics : boolean
-  .texmapTranslucencyFraction : texturemap
-  .texmapOnTranslucencyFraction : boolean
-  .mapamountTranslucencyFraction : float
-  .scatterColor (scatteringColor) : RGB color
-  .scatterDirectionality (scatteringDirectionality) : float
-  .mapamountAbsorption : float
-  .texmapOnAbsorption : boolean
-  .texmapAbsorption : texturemap
-  .mapamountScatterColor (mapamountScatteringColor) : float
-  .texmapOnScatterColor (texmapOnScatteringAlbedo) : boolean
-  .texmapScatterColor (texmapScatteringAlbedo) : texturemap
-  .visibleInMasks : boolean
-  .singleBounceOnly (volumetricSingleBounceOnly) : boolean
-  .displacementWaterLevelOn : boolean
-  .legacyBrdfNormalization : boolean
-  .legacyMode : boolean
-  .legacyColoredOpacity : boolean
-  .anisotropyOrientationMode : integer
-  .anisotropyOrientationUvwChannel : integer
-  .pbrMode : boolean
-  .opacityCutout (Opacity_cutout_mode) : boolean
-  .refractDispersionEnable (enableDispersion) : boolean
-  .refractDispersion (dispersion) : float
-  .levelSss : float
-  .sssScatterColor : RGB color
-  .sssRadius : worldUnits
-  .texmapOnSssAmount : boolean
-  .texmapOnSssRadius : boolean
-  .texmapSssAmount : texturemap
-  .texmapSssRadius : texturemap
-  .mapamountSssAmount : float
-  .mapamountSssRadius : float
-  .texmapOnSssScatterColor : boolean
-  .texmapSssScatterColor : texturemap
-  .mapamountSssScatterColor : float
-  .materialLibraryId : string
-  .mediaMode (Media_scattering_mode) : integer
-*/
-
-
-
--- show (XRef_Material())
-
-
-
-
-
-
-
-
-
-
-/*
-
-
-
-	-------- depuis le fichier que l'on veut couper :  ------------------------------------------------
-	* on a besoin de connaitre (Utilisateur) :
-		* 	les objets que l'on veut couper 							----> decoupe_nds )
-		* 	la hauteur ou l'on veut couper 								----> ( decoupe_ht )
-		* 	la couleur de l'endroit coupé								----> ( decoupe_couleur )
-	
-	* 	on liste tout les objets de la scene.							----> ( nds_scene )
-	* 	on check la sauvegarde du fichier en cour.
-	*	on creer un nouveau fichier vide.
-
-
-	-------- depuis le nouveau fichier ---------------------------------------------------------------
-	*	on importe en xref-object tout les objects de la scene.	 <---- ( nds_scene )
-
-	-------- la boite de découpe --------------
-	*	on prend la BB de la scene										----> ( BB_scene )
-	*	on creer la boite un peu plus grande que ( BB_scene )
-	*	on creer le materiau de la boite coupeuse :
-			*	creation de la Distance Map : couleurs, objets ( decoupe_nds ), ...
-
-
-*/
-
-
 
 
 
