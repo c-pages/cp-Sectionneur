@@ -9,10 +9,10 @@ replaceUI:true
 		local lastSize, meshObj
 		parameters pblock rollout:params
 		(
-			nds_aCouper	type:#nodeTab 		tabSize:0  		tabSizeVariable:true
-			nds_sections	type:#nodeTab 		tabSize:0  		tabSizeVariable:true
-			actif				type:#boolean			default:false
-			mode				type:#integer			default:1
+			nds_aCouper		type:#nodeTab 		tabSize:0  		tabSizeVariable:true
+			nds_sections		type:#nodeTab 		tabSize:0  		tabSizeVariable:true
+			actif					type:#boolean			default:false
+			touteLaScene 		type:#boolean			default:true
 		)
 		rollout params "HelperTest Parameters" width:162 height:32
 		(
@@ -31,8 +31,8 @@ replaceUI:true
 		fn set_actif	_val	= actif = _val
 		fn get_actif			= actif
 		
-		fn set_mode	_val	= mode = _val
-		fn get_mode			= mode
+		fn set_touteLaScene	_val	= touteLaScene = _val
+		fn get_touteLaScene			= touteLaScene
 		
 		tool create
 		(

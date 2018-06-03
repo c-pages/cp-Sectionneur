@@ -9,14 +9,14 @@ version:1
 (
 	
 
-/* 	
-.giMtl (globalIlluminationMtl) : material
-.reflectMtl (reflectionMtl) : material
-.refractMtl (refractionMtl) : material
-.directMtl (directlyVisibleMtl) : material
-.displacementSource (displacementFrom) : integer
-.viewportSource (Material_shown_in_the_viewport) : integer
-*/
+		/* 	
+		.giMtl (globalIlluminationMtl) : material
+		.reflectMtl (reflectionMtl) : material
+		.refractMtl (refractionMtl) : material
+		.directMtl (directlyVisibleMtl) : material
+		.displacementSource (displacementFrom) : integer
+		.viewportSource (Material_shown_in_the_viewport) : integer
+		*/
 	local blendMat
 	
 	parameters main rollout:params	(

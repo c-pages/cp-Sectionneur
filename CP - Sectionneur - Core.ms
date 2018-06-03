@@ -46,7 +46,7 @@ filein	 "$userScripts\\cp-Sectionneur\\cp - Sectionneur - Helper Plugin.ms"
 ------------------------------------------------------------------------------
 ----------	Fenetre								 -------------------------
 ------------------------------------------------------------------------------
-rollout roll_sectionneur "sectionneur" width:522 height:232
+rollout roll_sectionneur "sectionneur" width:340 height:223
 (
 	------------  Membres	----------------------------------------------------------------------------------
 	---- Pointeurs ----
@@ -61,39 +61,37 @@ rollout roll_sectionneur "sectionneur" width:522 height:232
 	pickbutton 'btn_section_nvNode' "+" pos:[134,7] width:16 height:16 align:#left
 -- 	button 'btn_section_nvlleBox' "Box" pos:[9,7] width:34 height:16 align:#left
 	button 'btn_section_supprimer' "-" pos:[149,7] width:16 height:16 align:#left
-	checkbox 'chk_ombres' "Ombres" pos:[9,121] width:117 height:15 checked:true align:#left
-	radiobuttons 'rdo_applyTo' "Apply to :" pos:[9,139] width:108 height:46 labels:#("Scene", "Nodes", "XRef") columns:2 align:#left
-	checkbutton 'btn_appliquer' "Activer" pos:[9,189] width:44 height:34 align:#left
-	multiListBox 'lbx_exclude' "" pos:[181,23] width:156 height:15 align:#left
-	multiListBox 'lbx_include' "" pos:[354,23] width:156 height:15 align:#left
-	button 'btn_to_include' ">" pos:[338,25] width:16 height:16 align:#left
-	button 'btn_to_exclude' "<" pos:[338,40] width:16 height:16 align:#left
-	label 'lbl_exclude' "Exclude" pos:[181,7] width:44 height:14 align:#left
-	label 'lbl_include' "Include" pos:[354,7] width:44 height:14 align:#left
-	button 'btn_selection_to_include' "+" pos:[338,65] width:16 height:16 align:#left
-	label 'lblsections' "Sections" pos:[12,7] width:44 height:14 align:#left
+	checkbox 'chk_ombres' "Ombres" pos:[19,148] width:67 height:15 checked:true align:#left
+	multiListBox 'lbx_include' "" pos:[175,23] width:156 height:14 align:#left
+	checkbutton 'btn_on' "ON" pos:[9,185] width:30 height:30 highlightColor:(color 255 255 0) toolTip:"Applique le materiaux de découpe." align:#left
+	label 'lbl_include' "Objets à couper :" pos:[175,7] width:86 height:14 align:#left
+	button 'btn_ajouter_ndACouper' "+" pos:[302,7] width:16 height:16 align:#left
+	label 'lblsections' "Découpeurs:" pos:[12,7] width:61 height:14 align:#left
+	button 'btn_creer_fichierCoupe' "Creer fichier Coupe" pos:[38,185] width:114 height:30 align:#left
+	button 'btn_retirer_ndACouper' "-" pos:[317,7] width:16 height:16 align:#left
+	button 'btn_option_fichierCoupe' "+" pos:[151,185] width:16 height:30 align:#left
+	GroupBox 'grpOptions' "Options" pos:[10,133] width:155 height:48 align:#left
+	checkbox 'chk_touteLaScene' "Appliquer à toute la scène" pos:[10,119] width:156 height:15 checked:true align:#left
+	checkbox 'chk_planDeCoupe' "Plan de coupe" pos:[19,163] width:88 height:15 checked:true align:#left
+	colorPicker 'cp_planDeCoupe' "" pos:[144,163] width:15 height:15 align:#left
 	
-	button 'btn_select_ndsACouper' "Select" pos:[476,6] width:35 height:16 align:#left
-	button 'btn_select_ndsSections' "Select" pos:[98,7] width:35 height:16 align:#left
 	
-	button 'btn_creer_fichierCoupe' "Creer fichier Coupe" pos:[52,189] width:114 height:18 align:#left
 	
 	------------  Fonctions	----------------------------------------------------------------------------------	
 	fn redimensionner		=(
-		if m_prt.get_mode ()  == 1 then
+		if m_prt.get_touteLaScene () then
 			roll_sectionneur.width = 175
 		else 
-			roll_sectionneur.width = 522
+			roll_sectionneur.width = 341
 	)
 	fn actualiser = (
 		
 		lbx_sections.items		= 	for section in m_prt.get_sections() collect section.name
 		chk_ombres.checked 	= 	m_prt.get_ombresUse ()
-		rdo_applyTo.state 		=	m_prt.get_mode ()
-		btn_appliquer.checked 	= 	m_prt.est_actif ()
+-- 		rdo_applyTo.state 		=	m_prt.get_mode ()
+		chk_touteLaScene.checked = m_prt.get_touteLaScene () 
+		btn_on.checked 	= 	m_prt.est_actif ()
 		
-		nds_exclude				=	for obj in geometry where not m_prt.est_aCouper   obj collect obj
-		lbx_exclude.items 		=	for obj in nds_exclude collect obj.name
 		nds_include					=	m_prt.get_nds_aCouper ()
 		lbx_include.items 			=	for obj in nds_include where obj != undefined collect obj.name
 		
@@ -109,10 +107,10 @@ rollout roll_sectionneur "sectionneur" width:522 height:232
 	)
 	
 	
-	------------  Evenements	----------------------------------------------------------------------------------
-
+	------------  Evenements	----------------------------------------------------------------------------------	
 	
-	
+	on lbx_sections doubleClicked sel do
+		select (m_prt.get_sections() ) [ sel ]
 	on btn_section_nvNode picked obj do
 	(
 			m_prt.ajouter_section	obj
@@ -125,48 +123,37 @@ rollout roll_sectionneur "sectionneur" width:522 height:232
 		)
 	on chk_ombres changed state do
 		m_prt.set_ombresUse	 state
-	on rdo_applyTo changed state do
-	(
-					m_prt.set_mode	 state
-					redimensionner ()
-				)
-	on btn_appliquer changed state do
+	on btn_on changed state do
 	(
 				case state of (
 					true:		m_prt.activer 		()
 					false: 	m_prt.desactiver 	()
 				)
 			)
-	on btn_to_include pressed do
-	(
-		for id_obj in ( lbx_exclude.selection as array ) do
-			m_prt.ajouter_ndAcouper	nds_exclude[id_obj]
-		actualiser ()	
-		
-	)
-	on btn_to_exclude pressed do
-	(
-			for id_obj in ( lbx_include.selection as array ) do
-				m_prt.retirer_ndAcouper	nds_include[id_obj]
-			actualiser ()	
-		)
-	on btn_selection_to_include pressed do
+	on btn_ajouter_ndACouper pressed do
 	(
 						m_prt.ajouter_ndAcouper	(selection as array )
 						actualiser ()	
-		)
-	on btn_select_ndsACouper pressed do
-	(
-	
-		)
-	on btn_select_ndsSections pressed do
-	(
-	
 		)
 	on btn_creer_fichierCoupe pressed do
 	(
 		m_prt.creer_fichierCoupe	()
 	)
+	on btn_retirer_ndACouper pressed do
+	(
+						m_prt.ajouter_ndAcouper	(selection as array )
+						actualiser ()	
+		)
+	on btn_option_fichierCoupe pressed do
+	(
+		m_prt.creer_fichierCoupe	()
+	)
+	on chk_touteLaScene changed state do (
+		m_prt.set_touteLaScene	 state
+		redimensionner ()
+	)
+	on chk_planDeCoupe changed state do
+		m_prt.set_ombresUse	 state
 )
 
 
@@ -194,7 +181,8 @@ struct str_sectionneur (
 		actif 				= 	false,
 		effectif			=	false,
 		
-		mode				=	1,		---- ( 1: Scene, 2: nodes, 3: layers, 4: Xrefs	)
+-- 		mode				=	1,		---- ( 1: Scene, 2: nodes, 3: layers, 4: Xrefs	)
+		touteLaScene	=	true,
 		ombres_use	=	true,
 		
 		---- Materiau / map pour la découpe --------------
@@ -228,15 +216,15 @@ struct str_sectionneur (
 		------ Helper Sectionneur -------------------
 		fn maj_hlp_sectionneur =(
 			
-			hlp_sectionneur.set_mode				mode
-			hlp_sectionneur.set_actif				actif
-			hlp_sectionneur.set_ndsSections	sections
-			hlp_sectionneur.set_ndsAcouper		nds_aCouper
+			hlp_sectionneur.set_touteLaScene		touteLaScene
+			hlp_sectionneur.set_actif					actif
+			hlp_sectionneur.set_ndsSections		sections
+			hlp_sectionneur.set_ndsAcouper			nds_aCouper
 			
 		),
 		fn maj_FROM_sectionneur 		_nd	=(
 			
-			mode				=	_nd.get_mode		()		
+			touteLaScene	=	_nd.get_touteLaScene		()		
 			actif				=	_nd.get_actif 		()
 			nds_aCouper	=	_nd.get_ndsAcouper ()
 			sections			=	_nd.get_ndsSections ()
@@ -271,18 +259,19 @@ struct str_sectionneur (
 		fn get_nds_aCouper 		= 	for nd in nds_aCouper collect nd,	
 		fn est_actif					=	actif,
 		fn get_sections				=	for sect in sections collect sect,
-		fn set_mode	_mode		= 	(
-			mode = _mode
+		fn set_touteLaScene	_touteLaScene		= 	(
+			touteLaScene = _touteLaScene
 			maj_hlp_sectionneur()
 		),
-		fn get_mode					= 	mode,
+		fn get_touteLaScene		= 	touteLaScene,
 		fn get_ombresUse			=	ombres_use,
 		fn set_ombresUse	_val	= with redraw off 	(
 			ombres_use = _val
 			materiaux_decoupe.shadows = ombres_use
 		),
 		fn get_blendMat 				=  (
-			local blendMat 			= Blend ()			
+			
+			local blendMat 			=	Blend ()			
 			blendMat.map2			=	invisMat
 			blendMat.mask			=	distMap
 			
@@ -502,8 +491,8 @@ struct str_sectionneur (
 			local nodes_aCouper =#()
 			
 			
-			case mode of(
-				1: ( ------------------------------------- SCENE -------------------------------------
+			case touteLaScene of(
+				true: ( ------------------------------------- SCENE -------------------------------------
 -- 						local mats = for mat in sceneMaterials collect mat
 					
 						debug "mats_aRemplacer" var:mats_aRemplacer		param:#name
@@ -531,7 +520,7 @@ struct str_sectionneur (
 				
 				
 				
-				2:	( ------------------------------------- NODES -------------------------------------
+				false:	( ------------------------------------- NODES -------------------------------------
 					nodes_aCouper = get_nds_aCouper ()
 					
 					local nodes_aTraiter = for nd in  nodes_aCouper collect nd
@@ -550,38 +539,38 @@ struct str_sectionneur (
 						
 						
 						local nd 			= nodes_aTraiter[	1	]
-						
-						if nd.material  != undefined then (
-							
-							---- DEBUG IF TRUE -------------------
-							if false then (
-		-- <Sectionneur >	---	total  	69.782 s.
-								nd.material	=	get_matSection_fromMat 	nd.material
+						if nd != undefined do (
+							if  nd.material  != undefined then (
+								
+								---- DEBUG IF TRUE -------------------
+								if false then (
+			-- <Sectionneur >	---	total  	69.782 s.
+									nd.material	=	get_matSection_fromMat 	nd.material
+									deleteItem nodes_aTraiter 1
+								) else (
+								---- DEBUG BACK -------------------
+									local ids_aSupprimer 	= #{}
+									local	objs_memeMat 	= for i = 1 to nodes_aTraiter.count where   nodes_aTraiter[i] != undefined  	and  nodes_aTraiter[i].material == nd.material  	collect  ( ids_aSupprimer[i] = true; nodes_aTraiter[i] )
+				-- 					replaceInstances 
+									
+									local mat_section 		= get_matSection_fromMat 	nd.material
+			-- 						replaceinstances	nd.material	mat_section
+									objs_memeMat.material = mat_section
+									
+									for i = (ids_aSupprimer as array).count to 1 by -1 do 
+										deleteItem nodes_aTraiter 	( ( ids_aSupprimer) as array)[i]
+								)
+								
+							) else (	
+								
+								
+								local mat_section 	= get_matSection_fromMat 	( Sectionneur_undefined_mat 	name:"Sectionneur_undefined_mat"		color:nd.wirecolor )
+								nd.material 			= mat_section
+								
 								deleteItem nodes_aTraiter 1
-							) else (
-							---- DEBUG BACK -------------------
-								local ids_aSupprimer 	= #{}
-								local	objs_memeMat 	= for i = 1 to nodes_aTraiter.count where 	 nodes_aTraiter[i].material == nd.material  	collect  ( ids_aSupprimer[i] = true; nodes_aTraiter[i] )
-			-- 					replaceInstances 
 								
-								local mat_section 		= get_matSection_fromMat 	nd.material
-		-- 						replaceinstances	nd.material	mat_section
-								objs_memeMat.material = mat_section
-								
-								for i = (ids_aSupprimer as array).count to 1 by -1 do 
-									deleteItem nodes_aTraiter 	( ( ids_aSupprimer) as array)[i]
 							)
-							
-						) else (	
-							
-							
-							local mat_section 	= get_matSection_fromMat 	( Sectionneur_undefined_mat 	name:"Sectionneur_undefined_mat"		color:nd.wirecolor )
-							nd.material 			= mat_section
-							
-							deleteItem nodes_aTraiter 1
-							
 						)
-						
 					)
 					
 				)
@@ -783,7 +772,6 @@ struct str_sectionneur (
 
 ---- declaration du manager de scetions ----------------
 Sectionneur		=	str_sectionneur ()
-
 
 
 
